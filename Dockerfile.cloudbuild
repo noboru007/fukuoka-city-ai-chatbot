@@ -3,10 +3,12 @@ FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# API Key をビルド引数として受け取る
+# API Keys をビルド引数として受け取る
 ARG API_KEY
+ARG FISH_API_KEY
 ENV API_KEY=$API_KEY
 ENV GEMINI_API_KEY=$API_KEY
+ENV FISH_API_KEY=$FISH_API_KEY
 
 # Copy package files
 COPY package*.json ./
@@ -17,10 +19,18 @@ RUN npm ci
 # Copy source files
 COPY . .
 
-# Create .env file with API_KEY for Vite to read during build
+# Debug: Check if API_KEY is set
+RUN echo "=== Debug: API_KEY during build ===" && \
+    echo "API_KEY length: ${#API_KEY}" && \
+    echo "API_KEY first 10 chars: ${API_KEY:0:10}" && \
+    echo "FISH_API_KEY first 10 chars: ${FISH_API_KEY:0:10}"
+
+# Create .env file with API keys for Vite to read during build
 RUN echo "API_KEY=$API_KEY" > .env && \
     echo "GEMINI_API_KEY=$API_KEY" >> .env && \
-    echo "VITE_API_KEY=$API_KEY" >> .env
+    echo "FISH_API_KEY=$FISH_API_KEY" >> .env && \
+    echo "=== .env file created ===" && \
+    cat .env | sed 's/\(.\{10\}\).*/\1.../'
 
 # Build the application (API_KEY がビルド時に埋め込まれる)
 RUN npm run build && \

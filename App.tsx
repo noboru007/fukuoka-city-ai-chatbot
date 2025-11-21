@@ -12,7 +12,7 @@ const App: React.FC = () => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Updated version for verification
-  const APP_VERSION = "v0.43"; // Markdown bold markers removed from TTS
+  const APP_VERSION = "v0.44"; // Fixed API key embedding in build
 
   // Log version on component mount
   useEffect(() => {

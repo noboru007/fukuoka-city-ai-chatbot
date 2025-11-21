@@ -16,6 +16,8 @@ steps:
       - 'build'
       - '--build-arg'
       - 'API_KEY=${_API_KEY}'
+      - '--build-arg'
+      - 'FISH_API_KEY=${_FISH_API_KEY}'
       - '-t'
       - 'gcr.io/$PROJECT_ID/fukuoka-city-ai-chatbot:$BUILD_ID'
       - '-t'
@@ -50,10 +52,11 @@ steps:
       - 'managed'
       - '--allow-unauthenticated'
       - '--set-env-vars'
-      - 'API_KEY=${_API_KEY}'
+      - 'API_KEY=${_API_KEY},FISH_API_KEY=${_FISH_API_KEY}'
 
 substitutions:
   _API_KEY: 'YOUR_API_KEY_HERE'  # コマンドラインで上書きしてください
+  _FISH_API_KEY: 'YOUR_FISH_API_KEY_HERE'  # コマンドラインで上書きしてください
 
 images:
   - 'gcr.io/$PROJECT_ID/fukuoka-city-ai-chatbot:$BUILD_ID'
