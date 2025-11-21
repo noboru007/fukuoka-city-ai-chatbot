@@ -12,7 +12,7 @@ const App: React.FC = () => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Updated version for verification
-  const APP_VERSION = "v0.42"; // Fish Audio TTS (13 langs) + Gemini TTS fallback
+  const APP_VERSION = "v0.43"; // Markdown bold markers removed from TTS
 
   // Log version on component mount
   useEffect(() => {
