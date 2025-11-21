@@ -1,0 +1,29 @@
+# This file specifies files that are *not* uploaded to Google Cloud
+# using gcloud. It follows the same syntax as .gitignore, with the addition of
+# "#!include" directives (which insert the entries of the given .gitignore-style
+# file at that point).
+
+# node_modules は Docker ビルド内でインストールするため除外
+node_modules/
+.git
+.gitignore
+
+# ローカル環境ファイル
+.env.local
+.env
+
+# ビルド出力（Docker内でビルドするため不要）
+dist/
+
+# IDEファイル
+.vscode/
+.idea/
+
+# ログファイル
+*.log
+npm-debug.log*
+
+# OS固有ファイル
+.DS_Store
+Thumbs.db
+

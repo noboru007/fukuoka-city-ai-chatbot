@@ -1,0 +1,7 @@
+{
+  "name": "Fukuoka City AI Chatbot",
+  "description": "An AI-powered chatbot to assist users with questions about Fukuoka City services, simulating a conversation with a city hall employee. The chatbot remembers conversation history within a session.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

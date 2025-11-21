@@ -1,0 +1,61 @@
+steps:
+  # ビルド時に環境変数を設定
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # ビルド時に API_KEY を .env ファイルとして作成
+        echo "API_KEY=${_API_KEY}" > .env
+        echo "GEMINI_API_KEY=${_API_KEY}" >> .env
+        cat .env
+
+  # Docker イメージをビルド
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'API_KEY=${_API_KEY}'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/fukuoka-city-ai-chatbot:$BUILD_ID'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/fukuoka-city-ai-chatbot:latest'
+      - '-f'
+      - 'Dockerfile.cloudbuild'
+      - '.'
+
+  # Docker イメージを Container Registry にプッシュ
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/fukuoka-city-ai-chatbot:$BUILD_ID'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/fukuoka-city-ai-chatbot:latest'
+
+  # Cloud Run にデプロイ
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'fukuoka-city-ai-chatbot-v2'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/fukuoka-city-ai-chatbot:$BUILD_ID'
+      - '--region'
+      - 'us-west1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'API_KEY=${_API_KEY}'
+
+substitutions:
+  _API_KEY: 'YOUR_API_KEY_HERE'  # コマンドラインで上書きしてください
+
+images:
+  - 'gcr.io/$PROJECT_ID/fukuoka-city-ai-chatbot:$BUILD_ID'
+  - 'gcr.io/$PROJECT_ID/fukuoka-city-ai-chatbot:latest'
+

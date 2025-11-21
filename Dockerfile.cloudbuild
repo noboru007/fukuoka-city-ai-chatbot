@@ -1,0 +1,58 @@
+# Build stage
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+# API Key をビルド引数として受け取る
+ARG API_KEY
+ENV API_KEY=$API_KEY
+ENV GEMINI_API_KEY=$API_KEY
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including devDependencies for build)
+RUN npm ci
+
+# Copy source files
+COPY . .
+
+# Create .env file with API_KEY for Vite to read during build
+RUN echo "API_KEY=$API_KEY" > .env && \
+    echo "GEMINI_API_KEY=$API_KEY" >> .env && \
+    echo "VITE_API_KEY=$API_KEY" >> .env
+
+# Build the application (API_KEY がビルド時に埋め込まれる)
+RUN npm run build && \
+    echo "=== Build completed ===" && \
+    ls -la dist/ && \
+    echo "=== dist/index.html ===" && \
+    head -20 dist/index.html
+
+# Production stage
+FROM node:20-slim
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install production dependencies only
+RUN npm ci --omit=dev
+
+# Copy built files from builder stage
+COPY --from=builder /app/dist ./dist
+COPY server.js ./
+
+# Verify dist folder exists
+RUN echo "=== Verifying dist folder in production stage ===" && \
+    ls -la && \
+    ls -la dist/
+
+# Expose port
+ENV PORT=8080
+EXPOSE 8080
+
+# Start the server
+CMD ["node", "server.js"]
+
