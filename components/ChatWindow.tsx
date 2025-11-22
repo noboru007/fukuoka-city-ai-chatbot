@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Chat } from '@google/genai';
 import { initChat, streamChat, generateMultiSpeakerAudio, SPEAKER_NAMES } from '../services/geminiService';
-import type { Message as MessageType, ResponseLength, Language, Source } from '../types';
+import type { Message as MessageType, ResponseLength, Language, Source, Model } from '../types';
 import Message from './Message';
 import UserInput from './UserInput';
 import { translations } from '../utils/translations';
@@ -9,9 +9,10 @@ import { translations } from '../utils/translations';
 interface ChatWindowProps {
   responseLength: ResponseLength;
   language: Language;
+  model: Model;
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model }) => {
   const [chat, setChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -31,7 +32,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language }) => 
     const setupChat = async () => {
       setIsLoading(true);
       try {
-        const chatSession = await initChat(responseLength, language);
+        const chatSession = await initChat(responseLength, language, undefined, model);
         setChat(chatSession);
 
         const t = translations[language];
@@ -52,7 +53,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language }) => 
     };
 
     setupChat();
-  }, [responseLength, language]);
+  }, [responseLength, language, model]);
 
   const handleSendMessage = async (userInput: string) => {
     if (!chat || userInput.trim() === '') return;

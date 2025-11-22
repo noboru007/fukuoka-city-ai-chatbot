@@ -1,5 +1,5 @@
 import { GoogleGenAI, Chat, Modality } from "@google/genai";
-import { Source, ResponseLength, Language, AudioSegment } from "../types";
+import { Source, ResponseLength, Language, AudioSegment, Model } from "../types";
 import { getConfig } from "../utils/config";
 
 export const SPEAKER_NAMES = {
@@ -61,9 +61,10 @@ const getSystemInstruction = (responseLength: ResponseLength, language: Language
 # Strict Rules
 1.  **Fact Check**: Do not swallow user claims about facts (e.g., "There was an earthquake yesterday"). Verify with Google Search first.
 2.  **Strict Separation of Sources (CRITICAL - Follow this rule at all costs)**:
-    - **${names.agent}**'s source: **ONLY** information from Fukuoka City official websites (city.fukuoka.lg.jp) via Google Custom Search Engine (ID: e42d4555ba5554f82).
-    - **MANDATORY CHECK**: Before ${names.agent} answers, you MUST verify the information exists in the search results from the Custom Search Engine.
-    - **IF NO OFFICIAL INFO EXISTS**: ${names.agent} MUST say: "申し訳ございませんが、福岡市の公式情報では○○に関する情報を見つけることができませんでした。" (or equivalent in current language)
+    - **${names.agent}**'s source: **ONLY** information via Google Custom Search Engine (ID: e42d4555ba5554f82) and the following selected youtube official site by Fukuoka city.
+    - **YouTube Videos**: When recent YouTube video information is provided in the user message (marked with "# 最新のYouTube動画情報"), you MUST actively reference it. If the question relates to recent events, press conferences, or announcements, prioritize the YouTube video information. Include the video title and URL in your response.
+    - **MANDATORY CHECK**: Before ${names.agent} answers, you MUST verify the information exists in the search results from the Custom Search Engine OR in the provided YouTube video information.
+    - **IF NO RELEVANT INFO FOUND IN THE CUSTOM SEARCH ENGINE OR YOUTUBE VIDEO INFORMATION**: ${names.agent} MUST say: "申し訳ございませんが、福岡市の公式情報では○○に関する情報を見つけることができませんでした。" (or equivalent in current language)
     - **${names.grandma}**'s source: General knowledge or reliable external sources (news, etc.) OTHER than official Fukuoka City websites. ONLY use this role when ${names.agent} cannot provide official information.
 3.  **Response Structure**:
     - The part spoken by **${names.agent}** MUST start with the prefix "**${names.agent}：**".
@@ -82,17 +83,6 @@ ${lengthInstruction}
 1. **${names.agent}**: (Answer)
 2. **${names.grandma}**: (Answer)
 
-# Examples of Correct Behavior
-
-## Example 1: Information exists in official sources
-User: "能古島の人口は？"
-**${names.agent}：** 福岡市の公式データによりますと、能古島の人口は約700人でございます（令和5年時点）。
-**${names.grandma}：** 昔はもっと多かったんやけどね。でも今でも島の人たちはみんな仲良しで、いいところよ。
-
-## Example 2: Information does NOT exist in official sources (CORRECT - Don't fabricate!)
-User: "能古島にコンビニはある？"
-**${names.agent}：** 申し訳ございませんが、福岡市の公式情報では能古島のコンビニエンスストアに関する情報を見つけることができませんでした。
-**${names.grandma}：** あたしが知っとる限り、能古島には昔からコンビニはなかったけん、日用品は姪浜で買うか、島の商店を利用しよったよ。最近の状況は確かめてみんといかんね。
 `;
 }
 
@@ -114,12 +104,12 @@ export const getAi = async (): Promise<GoogleGenAI> => {
     return ai;
 };
 
-export const initChat = async (responseLength: ResponseLength, language: Language, history?: any[]): Promise<Chat> => {
+export const initChat = async (responseLength: ResponseLength, language: Language, history?: any[], model: Model = 'gemini-2.5-flash'): Promise<Chat> => {
     const genAI = await getAi();
     const systemInstruction = getSystemInstruction(responseLength, language);
 
     const chat = genAI.chats.create({
-    model: 'gemini-2.5-flash',
+    model: model,
     history,
     config: {
         systemInstruction,
@@ -128,6 +118,48 @@ export const initChat = async (responseLength: ResponseLength, language: Languag
     });
 
     return chat;
+};
+
+// Helper: Get latest YouTube videos from Fukuoka City Channel
+const getLatestYouTubeVideos = async (): Promise<Array<{ title: string; description: string; url: string; publishedAt: string }>> => {
+    try {
+        console.log('[YouTube] Fetching from /api/youtube...');
+        const response = await fetch('/api/youtube');
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[YouTube] API error:', response.status, response.statusText, errorText);
+            return [];
+        }
+        const data = await response.json();
+        console.log('[YouTube] API response:', { videoCount: data.videos?.length || 0, error: data.error });
+        
+        if (data.error) {
+            console.error('[YouTube] Server error:', data.error);
+            return [];
+        }
+        
+        const videos = data.videos || [];
+        if (videos.length > 0) {
+            console.log('[YouTube] First video:', videos[0].title);
+        }
+        return videos;
+    } catch (error) {
+        console.error('[YouTube] Fetch error:', error);
+        return [];
+    }
+};
+
+// Helper: Build YouTube context for LLM
+const buildYouTubeContext = (videos: Array<{ title: string; description: string; url: string; publishedAt: string }>): string => {
+    if (videos.length === 0) return '';
+    
+    const videoList = videos.map((video, index) => {
+        const date = new Date(video.publishedAt).toLocaleDateString('ja-JP');
+        const desc = video.description ? video.description.substring(0, 200) + '...' : '';
+        return `${index + 1}. ${video.title} (${date})\n   URL: ${video.url}\n   ${desc}`;
+    }).join('\n\n');
+    
+    return `\n\n# 最新のYouTube動画情報（福岡市公式チャンネル）\n以下の最新動画情報を参考にしてください。質問に関連する動画があれば、その情報を回答に含めてください。\n\n${videoList}`;
 };
 
 export async function* streamChat(chat: Chat, message: string) {
@@ -140,7 +172,29 @@ export async function* streamChat(chat: Chat, message: string) {
 export const sendMessage = async (chat: Chat, message: string): Promise<{ text: string; sources: Source[] }> => {
     let text = '';
     let sources: Source[] = [];
-    const stream = streamChat(chat, message);
+    
+    // Check if message might benefit from YouTube context (contains keywords related to recent info, videos, events)
+    const youtubeKeywords = ['動画', 'YouTube', '最新', '最近', '新着', 'イベント', '情報', '投稿', '配信', 'video', 'latest', 'recent', 'event'];
+    const needsYouTubeContext = youtubeKeywords.some(keyword => message.includes(keyword));
+    
+    let enhancedMessage = message;
+    if (needsYouTubeContext) {
+        console.log('[YouTube] Fetching latest videos for context...');
+        const videos = await getLatestYouTubeVideos();
+        console.log(`[YouTube] Received ${videos.length} videos from API`);
+        if (videos.length > 0) {
+            const youtubeContext = buildYouTubeContext(videos);
+            enhancedMessage = message + youtubeContext;
+            console.log(`[YouTube] Added context for ${videos.length} videos`);
+            console.log('[YouTube] Enhanced message preview:', enhancedMessage.substring(0, 300) + '...');
+        } else {
+            console.warn('[YouTube] No videos found, proceeding without YouTube context');
+        }
+    } else {
+        console.log('[YouTube] Skipping YouTube context (no relevant keywords found)');
+    }
+    
+    const stream = streamChat(chat, enhancedMessage);
     
     for await (const chunk of stream) {
         if (chunk.text) text += chunk.text;

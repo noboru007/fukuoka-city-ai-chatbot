@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ChatWindow from './components/ChatWindow';
-import type { FontSize, ResponseLength, Language } from './types';
+import type { FontSize, ResponseLength, Language, Model } from './types';
 import { MenuIcon } from './components/Icons';
 import { translations } from './utils/translations';
 
@@ -8,11 +8,12 @@ const App: React.FC = () => {
   const [fontSize, setFontSize] = useState<FontSize>('md');
   const [responseLength, setResponseLength] = useState<ResponseLength>('short');
   const [language, setLanguage] = useState<Language>('ja');
+  const [model, setModel] = useState<Model>('gemini-2.5-flash');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Updated version for verification
-  const APP_VERSION = "v0.50"; // Runtime Config Implementation
+  const APP_VERSION = "v0.56"; // Add LLM model selector (Flash/Pro) in hamburger menu
 
   // Log version on component mount
   useEffect(() => {
@@ -188,6 +189,25 @@ const App: React.FC = () => {
                             </button>
                         </div>
                     </div>
+                    <div className="px-4 py-2 border-b border-gray-700">
+                        <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-semibold">
+                            LLM Model
+                        </label>
+                        <div className="flex flex-col gap-1">
+                            <button
+                                onClick={() => setModel('gemini-2.5-flash')}
+                                className={`text-left text-sm px-2 py-1 rounded ${model === 'gemini-2.5-flash' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                            >
+                                Gemini 2.5 Flash
+                            </button>
+                            <button
+                                onClick={() => setModel('gemini-2.5-pro')}
+                                className={`text-left text-sm px-2 py-1 rounded ${model === 'gemini-2.5-pro' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                            >
+                                Gemini 2.5 Pro
+                            </button>
+                        </div>
+                    </div>
                     <div className="px-4 py-2 text-xs text-gray-500 text-center">
                         App Version: {APP_VERSION}
                     </div>
@@ -198,7 +218,7 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-grow overflow-hidden flex flex-col relative">
-        <ChatWindow responseLength={responseLength} language={language} />
+        <ChatWindow responseLength={responseLength} language={language} model={model} />
       </main>
     </div>
   );

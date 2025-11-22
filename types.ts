@@ -22,6 +22,8 @@ export type FontSize = 'sm' | 'md' | 'lg';
 
 export type ResponseLength = 'short' | 'long';
 
+export type Model = 'gemini-2.5-flash' | 'gemini-2.5-pro';
+
 export type Language = 
   | 'ja' // Japanese
   | 'en' // English
