@@ -20,6 +20,77 @@ const PORT = process.env.PORT || 8080;
 // JSON body parser
 app.use(express.json());
 
+// Environment variables endpoint (for frontend to fetch API keys)
+app.get('/api/config', (req, res) => {
+  // Only expose necessary environment variables to frontend
+  const config = {
+    API_KEY: process.env.API_KEY || null,
+    FISH_API_KEY: process.env.FISH_API_KEY || null,
+    FISH_AGENT_VOICE_ID: process.env.FISH_AGENT_VOICE_ID || null,
+    FISH_GRANDMA_VOICE_ID: process.env.FISH_GRANDMA_VOICE_ID || null,
+    // Language-specific voice IDs
+    FISH_AGENT_VOICE_ID_EN: process.env.FISH_AGENT_VOICE_ID_EN || null,
+    FISH_GRANDMA_VOICE_ID_EN: process.env.FISH_GRANDMA_VOICE_ID_EN || null,
+    FISH_AGENT_VOICE_ID_KR: process.env.FISH_AGENT_VOICE_ID_KR || null,
+    FISH_GRANDMA_VOICE_ID_KR: process.env.FISH_GRANDMA_VOICE_ID_KR || null,
+    FISH_AGENT_VOICE_ID_ZH: process.env.FISH_AGENT_VOICE_ID_ZH || null,
+    FISH_GRANDMA_VOICE_ID_ZH: process.env.FISH_GRANDMA_VOICE_ID_ZH || null,
+    FISH_AGENT_VOICE_ID_ES: process.env.FISH_AGENT_VOICE_ID_ES || null,
+    FISH_GRANDMA_VOICE_ID_ES: process.env.FISH_GRANDMA_VOICE_ID_ES || null,
+    FISH_AGENT_VOICE_ID_FR: process.env.FISH_AGENT_VOICE_ID_FR || null,
+    FISH_GRANDMA_VOICE_ID_FR: process.env.FISH_GRANDMA_VOICE_ID_FR || null,
+    FISH_AGENT_VOICE_ID_DE: process.env.FISH_AGENT_VOICE_ID_DE || null,
+    FISH_GRANDMA_VOICE_ID_DE: process.env.FISH_GRANDMA_VOICE_ID_DE || null,
+  };
+
+  console.log('[Config API] Serving config to frontend:', {
+    API_KEY: config.API_KEY ? 'YES' : 'NO',
+    FISH_API_KEY: config.FISH_API_KEY ? 'YES' : 'NO',
+  });
+
+  res.json(config);
+});
+
+// Gemini API Proxy
+app.post('/api/gemini', async (req, res) => {
+  try {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'Gemini API key not configured' });
+    }
+
+    const { endpoint, method = 'POST', body } = req.body;
+    
+    if (!endpoint) {
+      return res.status(400).json({ error: 'Missing endpoint' });
+    }
+
+    // Construct full URL
+    const url = `https://generativelanguage.googleapis.com/v1beta/${endpoint}?key=${apiKey}`;
+
+    // Forward request to Gemini API
+    const response = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error(`Gemini API error (${response.status}):`, data);
+      return res.status(response.status).json(data);
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error('Gemini API proxy error:', error);
+    res.status(500).json({ error: 'Internal server error', message: error.message });
+  }
+});
+
 // Fish Audio TTS Proxy API
 app.post('/api/fish-tts', async (req, res) => {
   try {

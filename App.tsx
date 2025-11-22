@@ -12,7 +12,7 @@ const App: React.FC = () => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Updated version for verification
-  const APP_VERSION = "v0.44"; // Fixed API key embedding in build
+  const APP_VERSION = "v0.46"; // Runtime config from server (no build-time secrets)
 
   // Log version on component mount
   useEffect(() => {
@@ -115,7 +115,7 @@ const App: React.FC = () => {
                         <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-semibold">
                             {t.menu.language}
                         </label>
-                         <select
+                        <select
                             value={language}
                             onChange={handleLanguageChange}
                             className="w-full bg-gray-700 text-white text-sm rounded p-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -198,7 +198,7 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-grow overflow-hidden flex flex-col relative">
-         <ChatWindow responseLength={responseLength} language={language} />
+        <ChatWindow responseLength={responseLength} language={language} />
       </main>
     </div>
   );

@@ -87,7 +87,7 @@ export const useLiveInput = ({ onTranscriptUpdate, onError }: UseLiveInputProps)
         streamRef.current = stream;
         onTranscriptUpdate('AIに接続しています...');
 
-        const ai = getAi();
+        const ai = await getAi();
         sessionPromiseRef.current = ai.live.connect({
             model: 'gemini-2.5-flash-native-audio-preview-09-2025',
             callbacks: {

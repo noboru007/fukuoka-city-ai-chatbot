@@ -1,5 +1,6 @@
 import { GoogleGenAI, Chat, Modality } from "@google/genai";
 import { Source, ResponseLength, Language, AudioSegment } from "../types";
+import { getConfig } from "../utils/config";
 
 export const SPEAKER_NAMES = {
     ja: { agent: '市役所エージェント', grandma: 'フク婆さん' },
@@ -82,15 +83,15 @@ ${lengthInstruction}
 
 let ai: GoogleGenAI | null = null;
 
-export const getAi = (): GoogleGenAI => {
+export const getAi = async (): Promise<GoogleGenAI> => {
     if (!ai) {
-        // Using bracket notation to avoid build-time replacements/censorship of API_KEY
-        // This allows us to read the 'API_KEY' environment variable set in Cloud Run.
-        const apiKey = process.env['API_KEY'];
+        // Fetch API key from server at runtime
+        const config = await getConfig();
+        const apiKey = config.API_KEY;
 
         if (!apiKey) {
             console.error("API Key is missing.");
-            throw new Error("API Key is missing. Please ensure API_KEY is set in Cloud Run.");
+            throw new Error("API Key is missing. Please ensure API_KEY is set in Cloud Run environment variables.");
         }
         
         ai = new GoogleGenAI({ apiKey: apiKey });
@@ -98,8 +99,8 @@ export const getAi = (): GoogleGenAI => {
     return ai;
 };
 
-export const initChat = (responseLength: ResponseLength, language: Language, history?: any[]): Chat => {
-    const genAI = getAi();
+export const initChat = async (responseLength: ResponseLength, language: Language, history?: any[]): Promise<Chat> => {
+    const genAI = await getAi();
     const systemInstruction = getSystemInstruction(responseLength, language);
 
     const chat = genAI.chats.create({
@@ -142,15 +143,16 @@ export const sendMessage = async (chat: Chat, message: string): Promise<{ text: 
 
 // Helper: Get Fish Audio Voice ID for specific language and speaker
 // Falls back to default (Japanese) if language-specific ID is not found
-const getFishAudioVoiceId = (speakerRole: 'agent' | 'grandma', language: Language): string | null => {
+const getFishAudioVoiceId = async (speakerRole: 'agent' | 'grandma', language: Language): Promise<string | null> => {
+    const config = await getConfig();
     const langKey = language.toUpperCase();
     
     // Try language-specific voice ID first
     const langSpecificKey = speakerRole === 'agent' 
-        ? `FISH_AGENT_VOICE_ID_${langKey}`
-        : `FISH_GRANDMA_VOICE_ID_${langKey}`;
+        ? `FISH_AGENT_VOICE_ID_${langKey}` as keyof typeof config
+        : `FISH_GRANDMA_VOICE_ID_${langKey}` as keyof typeof config;
     
-    const langSpecificVoiceId = process.env[langSpecificKey];
+    const langSpecificVoiceId = config[langSpecificKey];
     
     if (langSpecificVoiceId) {
         console.log(`[Fish Audio] Using ${language}-specific voice ID for ${speakerRole}: ${langSpecificVoiceId.substring(0, 8)}...`);
@@ -159,7 +161,7 @@ const getFishAudioVoiceId = (speakerRole: 'agent' | 'grandma', language: Languag
     
     // Fallback to default (Japanese) voice ID
     const defaultKey = speakerRole === 'agent' ? 'FISH_AGENT_VOICE_ID' : 'FISH_GRANDMA_VOICE_ID';
-    const defaultVoiceId = process.env[defaultKey];
+    const defaultVoiceId = config[defaultKey];
     
     if (defaultVoiceId) {
         console.log(`[Fish Audio] No ${language}-specific voice ID found, using default (Japanese) for ${speakerRole}: ${defaultVoiceId.substring(0, 8)}...`);
@@ -175,7 +177,7 @@ const generateFishAudioSegment = async (text: string, speakerRole: 'agent' | 'gr
     if (!text || !text.trim()) return null;
 
     // Get language-specific voice ID, fallback to default (Japanese)
-    const voiceId = getFishAudioVoiceId(speakerRole, language);
+    const voiceId = await getFishAudioVoiceId(speakerRole, language);
 
     if (!voiceId) {
         console.error(`[Fish Audio] Voice ID not configured for ${language} (${speakerRole})`);
@@ -334,7 +336,7 @@ const generateFishAudioMultiSpeaker = async (text: string, language: Language): 
 const generateGeminiMultiSpeakerAudio = async (text: string, language: Language): Promise<string | null> => {
     if (!text || !text.trim()) return null;
 
-    const ai = getAi();
+    const ai = await getAi();
     const names = SPEAKER_NAMES[language];
 
     // Clean text: For Gemini, we need to keep speaker names but in the correct format

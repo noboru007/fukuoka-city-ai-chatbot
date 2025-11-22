@@ -3,12 +3,7 @@ FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# API Keys をビルド引数として受け取る
-ARG API_KEY
-ARG FISH_API_KEY
-ENV API_KEY=$API_KEY
-ENV GEMINI_API_KEY=$API_KEY
-ENV FISH_API_KEY=$FISH_API_KEY
+# No build-time API keys needed (using runtime config)
 
 # Copy package files
 COPY package*.json ./
@@ -19,18 +14,9 @@ RUN npm ci
 # Copy source files
 COPY . .
 
-# Debug: Check if API_KEY is set
-RUN echo "=== Debug: API_KEY during build ===" && \
-    echo "API_KEY length: ${#API_KEY}" && \
-    echo "API_KEY first 10 chars: ${API_KEY:0:10}" && \
-    echo "FISH_API_KEY first 10 chars: ${FISH_API_KEY:0:10}"
-
-# Create .env file with API keys for Vite to read during build
-RUN echo "API_KEY=$API_KEY" > .env && \
-    echo "GEMINI_API_KEY=$API_KEY" >> .env && \
-    echo "FISH_API_KEY=$FISH_API_KEY" >> .env && \
-    echo "=== .env file created ===" && \
-    cat .env | sed 's/\(.\{10\}\).*/\1.../'
+# No build-time config needed
+# App will fetch config from /api/config at runtime
+RUN echo "=== Building with runtime config (no build-time secrets) ==="
 
 # Build the application (API_KEY がビルド時に埋め込まれる)
 RUN npm run build && \

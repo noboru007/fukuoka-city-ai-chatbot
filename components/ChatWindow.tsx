@@ -31,7 +31,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language }) => 
     const setupChat = async () => {
       setIsLoading(true);
       try {
-        const chatSession = initChat(responseLength, language);
+        const chatSession = await initChat(responseLength, language);
         setChat(chatSession);
 
         const t = translations[language];
@@ -39,7 +39,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language }) => 
             role: 'model',
             content: t.initialMessage,
             isGeneratingAudio: false,
-            audioContent: null,
+            audioSegments: [],
         };
         setMessages([initialMsg]);
 
