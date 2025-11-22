@@ -20,6 +20,13 @@ const PORT = process.env.PORT || 8080;
 // JSON body parser
 app.use(express.json());
 
+// Multer for file uploads
+import multer from 'multer';
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
+
 // Environment variables endpoint (for frontend to fetch API keys)
 app.get('/api/config', (req, res) => {
   // Only expose necessary environment variables to frontend
@@ -49,6 +56,101 @@ app.get('/api/config', (req, res) => {
   });
 
   res.json(config);
+});
+
+// Generate ephemeral token for Live API
+app.post('/api/ephemeral-token', async (req, res) => {
+  try {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'Gemini API key not configured' });
+    }
+
+    // Use SDK to generate ephemeral token
+    const { GoogleGenAI } = await import('@google/genai');
+    const client = new GoogleGenAI({ 
+      apiKey: apiKey,
+      httpOptions: { apiVersion: 'v1alpha' }
+    });
+
+    const now = new Date();
+    const expireTime = new Date(now.getTime() + 30 * 60 * 1000); // 30 minutes
+    const newSessionExpireTime = new Date(now.getTime() + 1 * 60 * 1000); // 1 minute
+
+    const token = await client.authTokens.create({
+      config: {
+        uses: 1,
+        expireTime: expireTime.toISOString(),
+        newSessionExpireTime: newSessionExpireTime.toISOString(),
+        httpOptions: { apiVersion: 'v1alpha' }
+      }
+    });
+
+    console.log('[Ephemeral Token] Generated successfully');
+    res.json({ token: token.name });
+
+  } catch (error) {
+    console.error('[Ephemeral Token] Generation error:', error);
+    console.error('[Ephemeral Token] Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Internal server error', 
+      message: error.message,
+      details: error.toString()
+    });
+  }
+});
+
+// Audio transcription endpoint
+app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
+  try {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'Gemini API key not configured' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No audio file provided' });
+    }
+
+    console.log('[Transcribe] Received audio file:', req.file.size, 'bytes, type:', req.file.mimetype);
+
+    // Import Gemini SDK
+    const { GoogleGenAI } = await import('@google/genai');
+    const genAI = new GoogleGenAI({ apiKey });
+
+    // Convert audio to base64 for inline data
+    console.log('[Transcribe] Converting audio to base64...');
+    const base64Audio = req.file.buffer.toString('base64');
+    
+    console.log('[Transcribe] Generating transcription with inline audio...');
+
+    // Generate transcription with inline audio (using gemini-2.0-flash which supports audio)
+    const result = await genAI.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: [{
+        parts: [
+          {
+            inlineData: {
+              data: base64Audio,
+              mimeType: req.file.mimetype,
+            },
+          },
+          {
+            text: 'この音声を日本語で文字起こししてください。文字起こしのテキストのみを返してください。',
+          },
+        ],
+      }],
+    });
+
+    const transcription = result.text();
+    console.log('[Transcribe] Transcription:', transcription);
+
+    res.json({ text: transcription });
+
+  } catch (error) {
+    console.error('[Transcribe] Error:', error);
+    res.status(500).json({ error: 'Transcription failed', message: error.message });
+  }
 });
 
 // Gemini API Proxy

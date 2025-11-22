@@ -45,11 +45,27 @@ const UserInput: React.FC<UserInputProps> = ({ onSendMessage, isLoading, languag
 
   const isRecordingOrTranscribing = recordingStatus !== 'idle';
 
+  const handleMicClick = () => {
+    if (recordingStatus === 'idle') {
+      startRecording();
+    } else if (recordingStatus === 'recording') {
+      stopRecording();
+    }
+    // preparing or transcribing: do nothing
+  };
+
   const micButtonClass = {
     idle: 'bg-gray-600 hover:bg-gray-500',
-    preparing: 'bg-yellow-600 animate-pulse',
-    recording: 'bg-red-600 animate-pulse',
-    transcribing: 'bg-gray-500 cursor-not-allowed',
+    preparing: 'bg-yellow-600 animate-pulse cursor-wait',
+    recording: 'bg-red-600 animate-pulse hover:bg-red-700',
+    transcribing: 'bg-blue-600 animate-pulse cursor-wait',
+  }[recordingStatus];
+
+  const micButtonLabel = {
+    idle: 'Start recording',
+    preparing: 'Preparing...',
+    recording: 'Stop recording',
+    transcribing: 'Processing...',
   }[recordingStatus];
 
   return (
@@ -66,14 +82,10 @@ const UserInput: React.FC<UserInputProps> = ({ onSendMessage, isLoading, languag
         />
         <button
           type="button"
-          onMouseDown={startRecording}
-          onMouseUp={stopRecording}
-          onTouchStart={startRecording}
-          onTouchEnd={stopRecording}
-          onMouseLeave={isRecordingOrTranscribing ? stopRecording : undefined}
-          disabled={isRecordingOrTranscribing}
+          onClick={handleMicClick}
+          disabled={recordingStatus === 'preparing' || recordingStatus === 'transcribing'}
           className={`text-white rounded-full p-2 transition-colors duration-200 flex-shrink-0 ${micButtonClass}`}
-          aria-label="Record message"
+          aria-label={micButtonLabel}
         >
           <MicrophoneIcon />
         </button>

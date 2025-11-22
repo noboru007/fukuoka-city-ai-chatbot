@@ -83,15 +83,15 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language }) => 
 
             // Extract sources FIRST so they are available for the text update
             if (chunk.candidates?.[0]?.groundingMetadata?.groundingChunks) {
-                 const newSources = chunk.candidates[0].groundingMetadata.groundingChunks
+                const newSources = chunk.candidates[0].groundingMetadata.groundingChunks
                     .filter((c: any) => c.web && c.web.uri)
                     .map((c: any) => ({ uri: c.web.uri, title: c.web.title || '' }));
-                 
-                 if (newSources.length > 0) {
-                     collectedSources = [...collectedSources, ...newSources];
-                     collectedSources = Array.from(new Map(collectedSources.map(item => [item.uri, item])).values());
-                     shouldUpdate = true;
-                 }
+                
+                if (newSources.length > 0) {
+                    collectedSources = [...collectedSources, ...newSources];
+                    collectedSources = Array.from(new Map(collectedSources.map(item => [item.uri, item])).values());
+                    shouldUpdate = true;
+                }
             }
 
             if (chunk.text) {
@@ -100,30 +100,30 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language }) => 
                 shouldUpdate = true;
                 
                 setMessages(prev => {
-                   const newMsgs = [...prev];
-                   if (newMsgs[botMessageIndex]) {
-                       newMsgs[botMessageIndex] = { 
-                           ...newMsgs[botMessageIndex], 
-                           content: fullText,
-                           sources: collectedSources 
+                  const newMsgs = [...prev];
+                  if (newMsgs[botMessageIndex]) {
+                      newMsgs[botMessageIndex] = { 
+                          ...newMsgs[botMessageIndex], 
+                          content: fullText,
+                          sources: collectedSources 
                         };
-                   }
-                   return newMsgs;
+                  }
+                  return newMsgs;
                 });
             }
 
             // If only sources were updated (and no text), trigger an update here
             if (shouldUpdate) {
-                 setMessages(prev => {
-                   const newMsgs = [...prev];
-                   if (newMsgs[botMessageIndex]) {
-                       newMsgs[botMessageIndex] = { 
-                           ...newMsgs[botMessageIndex], 
-                           content: fullText,
-                           sources: collectedSources 
+                setMessages(prev => {
+                  const newMsgs = [...prev];
+                  if (newMsgs[botMessageIndex]) {
+                      newMsgs[botMessageIndex] = { 
+                          ...newMsgs[botMessageIndex], 
+                          content: fullText,
+                          sources: collectedSources 
                         };
-                   }
-                   return newMsgs;
+                  }
+                  return newMsgs;
                 });
             }
         }
@@ -200,8 +200,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language }) => 
           />
         ))}
         {isLoading && messages.length > 0 && messages[messages.length - 1]?.role === 'user' && (
-           <div className="flex justify-start">
-           </div>
+          <div className="flex justify-start">
+          </div>
         )}
         <div ref={messagesEndRef} />
       </div>

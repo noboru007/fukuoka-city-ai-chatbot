@@ -12,7 +12,7 @@ const App: React.FC = () => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Updated version for verification
-  const APP_VERSION = "v0.46"; // Runtime config from server (no build-time secrets)
+  const APP_VERSION = "v0.50"; // Runtime Config Implementation
 
   // Log version on component mount
   useEffect(() => {
