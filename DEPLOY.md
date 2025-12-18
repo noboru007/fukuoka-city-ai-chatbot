@@ -1,90 +1,67 @@
-# 🚀 Google Cloud Run へのデプロイ手順
+# 🚀 デプロイ手順 (Cloud Build & Cloud Run)
+
+本番環境（us-west1）へのデプロイには、Google Cloud Build を使用します。これにより、`Dockerfile.cloudbuild` で定義されたビルドプロセスが確実に実行されます。
 
 ## 前提条件
 
-1. Google Cloud SDK (`gcloud`) がインストールされていること
-2. Google Cloud プロジェクトが作成されていること
-3. Gemini API キーを取得済みであること
+1.  Google Cloud SDK (`gcloud`) がインストールされていること
+2.  Google Cloud プロジェクト (`gen-lang-client-0686497338`) へのアクセス権があること
+3.  Docker (ローカルでの確認用、デプロイには必須ではありません)
 
 ## デプロイコマンド
 
-### 1. Google Cloud にログイン
+以下のコマンドを実行して、Cloud Build でのビルドとデプロイを開始します。
+
+### 1. Google Cloud にログイン (初回のみ)
 
 ```bash
 gcloud auth login
+gcloud config set project gen-lang-client-0686497338
 ```
 
-### 2. プロジェクトを設定
+### 2. Cloud Build を実行 (推奨)
+
+`cloudbuild.yaml` の設定に従ってビルドとデプロイを行います。
 
 ```bash
-gcloud config set project YOUR_PROJECT_ID
+gcloud builds submit --config cloudbuild.yaml .
 ```
 
-### 3. Cloud Run にデプロイ
+**このコマンドで実行される内容:**
+1.  `Dockerfile.cloudbuild` を使用して Docker イメージをビルド
+2.  イメージを Container Registry (`gcr.io`) にプッシュ
+3.  Cloud Run サービス (`fukuoka-city-ai-chatbot-v2`) に新しいイメージをデプロイ
+
+## 構成情報
+
+*   **プロジェクトID:** `gen-lang-client-0686497338`
+*   **リージョン:** `us-west1`
+*   **サービス名:** `fukuoka-city-ai-chatbot-v2`
+*   **環境変数:** Cloud Run コンソール上で設定済み（再デプロイ時も引き継がれます）
+
+## (参考) 旧デプロイ手順 / ローカル簡易デプロイ
+
+開発中の簡易確認などで、手元のソースコードから直接デプロイしたい場合は以下を使用できますが、本番環境への反映は上記の Cloud Build 手順を推奨します。
 
 ```bash
+# 旧 v1 サービスへのデプロイ (東京リージョン)
 gcloud run deploy fukuoka-city-ai-chatbot \
   --source . \
   --region asia-northeast1 \
-  --allow-unauthenticated \
-  --set-env-vars API_KEY=YOUR_GEMINI_API_KEY
+  --allow-unauthenticated
 ```
-
-**パラメータ説明:**
-- `--source .`: 現在のディレクトリをソースとしてアップロード（自動ビルド）
-- `--region asia-northeast1`: 東京リージョン（日本に最も近い）
-- `--allow-unauthenticated`: 誰でもアクセス可能にする
-- `--set-env-vars API_KEY=...`: Gemini API キーを環境変数として設定
-
-### 4. デプロイ完了後
-
-デプロイが完了すると、URL が表示されます：
-```
-Service URL: https://fukuoka-city-ai-chatbot-xxxxx-an.a.run.app
-```
-
-ブラウザでこの URL にアクセスして動作確認してください。
-
-## リージョンの選択肢
-
-- `asia-northeast1` (東京) - 推奨
-- `asia-northeast2` (大阪)
-- `us-central1` (アメリカ中部)
-
-## 注意事項
-
-⚠️ **API キーの管理:**
-- コマンドに API キーを直接入力する際は、履歴に残らないよう注意してください
-- または、Secret Manager を使用することをお勧めします
-
-⚠️ **コスト:**
-- Cloud Run は従量課金制です
-- 無料枠: 月間 200万リクエスト、36万 GB-秒
 
 ## トラブルシューティング
 
 ### ビルドエラーが発生した場合
+Cloud Build のログ URL がコンソールに表示されるので、詳細を確認してください。
 
-1. `package.json` の `scripts` に `start` コマンドが定義されているか確認
-2. ローカルで `npm run build` が成功するか確認
+### 環境変数の変更
+環境変数を追加・変更したい場合は、Cloud Run のコンソール画面から編集するか、以下のコマンドを使用します：
 
-### API キーが認識されない場合
-
-環境変数の設定を確認：
 ```bash
-gcloud run services describe fukuoka-city-ai-chatbot \
-  --region asia-northeast1 \
-  --format="value(spec.template.spec.containers[0].env)"
-```
-
-### 既存のサービスを更新する場合
-
-同じコマンドを再実行するだけで更新されます：
-```bash
-gcloud run deploy fukuoka-city-ai-chatbot \
-  --source . \
-  --region asia-northeast1 \
-  --allow-unauthenticated \
-  --set-env-vars API_KEY=YOUR_NEW_API_KEY
+gcloud run services update fukuoka-city-ai-chatbot-v2 \
+  --region us-west1 \
+  --update-env-vars KEY=VALUE
 ```
 

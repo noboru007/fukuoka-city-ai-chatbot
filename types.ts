@@ -22,9 +22,9 @@ export type FontSize = 'sm' | 'md' | 'lg';
 
 export type ResponseLength = 'short' | 'long';
 
-export type Model = 'gemini-2.5-flash' | 'gemini-2.5-pro';
+export type Model = 'gemini-3-flash-preview' | 'gemini-2.5-pro';
 
-export type Language = 
+export type Language =
   | 'ja' // Japanese
   | 'en' // English
   | 'ko' // Korean

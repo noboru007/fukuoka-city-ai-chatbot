@@ -8,12 +8,12 @@ const App: React.FC = () => {
   const [fontSize, setFontSize] = useState<FontSize>('md');
   const [responseLength, setResponseLength] = useState<ResponseLength>('short');
   const [language, setLanguage] = useState<Language>('ja');
-  const [model, setModel] = useState<Model>('gemini-2.5-flash');
+  const [model, setModel] = useState<Model>('gemini-2.5-pro');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Updated version for verification
-  const APP_VERSION = "v0.56"; // Add LLM model selector (Flash/Pro) in hamburger menu
+  const APP_VERSION = "v0.57"; // Add LLM model selector (Gemini 3 Flash/Pro) in hamburger menu
 
   // Log version on component mount
   useEffect(() => {
@@ -102,117 +102,117 @@ const App: React.FC = () => {
         </div>
 
         <div className="relative" ref={menuRef}>
-            <button 
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="p-2 text-gray-400 hover:text-white focus:outline-none"
-            >
-                <MenuIcon />
-            </button>
+          <button
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            className="p-2 text-gray-400 hover:text-white focus:outline-none"
+          >
+            <MenuIcon />
+          </button>
 
-            {isMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg py-1 border border-gray-700 z-50">
-                     {/* Language Selector in Menu */}
-                    <div className="px-4 py-2 border-b border-gray-700">
-                        <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-semibold">
-                            {t.menu.language}
-                        </label>
-                        <select
-                            value={language}
-                            onChange={handleLanguageChange}
-                            className="w-full bg-gray-700 text-white text-sm rounded p-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                          >
-                            <option value="ja">日本語</option>
-                            <option value="en">English</option>
-                            <option value="ko">한국어</option>
-                            <option value="zh">中文</option>
-                            <option value="es">Español</option>
-                            <option value="fr">Français</option>
-                            <option value="de">Deutsch</option>
-                            <option value="it">Italiano</option>
-                            <option value="pt">Português</option>
-                            <option value="vi">Tiếng Việt</option>
-                            <option value="th">ไทย</option>
-                            <option value="id">Bahasa Indonesia</option>
-                            <option value="ru">Русский</option>
-                            <option value="my">မြန်မာဘာသာ</option>
-                            <option value="ms">Bahasa Melayu</option>
-                            <option value="ur">اردو</option>
-                            <option value="ne">नेपाली</option>
-                            <option value="ta">தமிழ்</option>
-                            <option value="hi">हिन्दी</option>
-                            <option value="tl">Tagalog</option>
-                            <option value="lo">ລາວ</option>
-                          </select>
-                    </div>
+          {isMenuOpen && (
+            <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg py-1 border border-gray-700 z-50">
+              {/* Language Selector in Menu */}
+              <div className="px-4 py-2 border-b border-gray-700">
+                <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-semibold">
+                  {t.menu.language}
+                </label>
+                <select
+                  value={language}
+                  onChange={handleLanguageChange}
+                  className="w-full bg-gray-700 text-white text-sm rounded p-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="ja">日本語</option>
+                  <option value="en">English</option>
+                  <option value="ko">한국어</option>
+                  <option value="zh">中文</option>
+                  <option value="es">Español</option>
+                  <option value="fr">Français</option>
+                  <option value="de">Deutsch</option>
+                  <option value="it">Italiano</option>
+                  <option value="pt">Português</option>
+                  <option value="vi">Tiếng Việt</option>
+                  <option value="th">ไทย</option>
+                  <option value="id">Bahasa Indonesia</option>
+                  <option value="ru">Русский</option>
+                  <option value="my">မြန်မာဘာသာ</option>
+                  <option value="ms">Bahasa Melayu</option>
+                  <option value="ur">اردو</option>
+                  <option value="ne">नेपाली</option>
+                  <option value="ta">தமிழ்</option>
+                  <option value="hi">हिन्दी</option>
+                  <option value="tl">Tagalog</option>
+                  <option value="lo">ລາວ</option>
+                </select>
+              </div>
 
-                    <div className="px-4 py-2 border-b border-gray-700">
-                        <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-semibold">
-                            {t.menu.fontSize}
-                        </label>
-                        <div className="flex flex-col gap-1">
-                            <button
-                                onClick={() => setFontSize('sm')}
-                                className={`text-left text-sm px-2 py-1 rounded ${fontSize === 'sm' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
-                            >
-                                {t.menu.sm}
-                            </button>
-                            <button
-                                onClick={() => setFontSize('md')}
-                                className={`text-left text-sm px-2 py-1 rounded ${fontSize === 'md' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
-                            >
-                                {t.menu.md}
-                            </button>
-                            <button
-                                onClick={() => setFontSize('lg')}
-                                className={`text-left text-sm px-2 py-1 rounded ${fontSize === 'lg' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
-                            >
-                                {t.menu.lg}
-                            </button>
-                        </div>
-                    </div>
-                    <div className="px-4 py-2 border-b border-gray-700">
-                        <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-semibold">
-                            {t.menu.responseLength}
-                        </label>
-                        <div className="flex flex-col gap-1">
-                            <button
-                                onClick={() => setResponseLength('short')}
-                                className={`text-left text-sm px-2 py-1 rounded ${responseLength === 'short' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
-                            >
-                                {t.menu.short}
-                            </button>
-                            <button
-                                onClick={() => setResponseLength('long')}
-                                className={`text-left text-sm px-2 py-1 rounded ${responseLength === 'long' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
-                            >
-                                {t.menu.long}
-                            </button>
-                        </div>
-                    </div>
-                    <div className="px-4 py-2 border-b border-gray-700">
-                        <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-semibold">
-                            LLM Model
-                        </label>
-                        <div className="flex flex-col gap-1">
-                            <button
-                                onClick={() => setModel('gemini-2.5-flash')}
-                                className={`text-left text-sm px-2 py-1 rounded ${model === 'gemini-2.5-flash' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
-                            >
-                                Gemini 2.5 Flash
-                            </button>
-                            <button
-                                onClick={() => setModel('gemini-2.5-pro')}
-                                className={`text-left text-sm px-2 py-1 rounded ${model === 'gemini-2.5-pro' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
-                            >
-                                Gemini 2.5 Pro
-                            </button>
-                        </div>
-                    </div>
-                    <div className="px-4 py-2 text-xs text-gray-500 text-center">
-                        App Version: {APP_VERSION}
-                    </div>
+              <div className="px-4 py-2 border-b border-gray-700">
+                <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-semibold">
+                  {t.menu.fontSize}
+                </label>
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => setFontSize('sm')}
+                    className={`text-left text-sm px-2 py-1 rounded ${fontSize === 'sm' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                  >
+                    {t.menu.sm}
+                  </button>
+                  <button
+                    onClick={() => setFontSize('md')}
+                    className={`text-left text-sm px-2 py-1 rounded ${fontSize === 'md' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                  >
+                    {t.menu.md}
+                  </button>
+                  <button
+                    onClick={() => setFontSize('lg')}
+                    className={`text-left text-sm px-2 py-1 rounded ${fontSize === 'lg' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                  >
+                    {t.menu.lg}
+                  </button>
                 </div>
-            )}
+              </div>
+              <div className="px-4 py-2 border-b border-gray-700">
+                <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-semibold">
+                  {t.menu.responseLength}
+                </label>
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => setResponseLength('short')}
+                    className={`text-left text-sm px-2 py-1 rounded ${responseLength === 'short' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                  >
+                    {t.menu.short}
+                  </button>
+                  <button
+                    onClick={() => setResponseLength('long')}
+                    className={`text-left text-sm px-2 py-1 rounded ${responseLength === 'long' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                  >
+                    {t.menu.long}
+                  </button>
+                </div>
+              </div>
+              <div className="px-4 py-2 border-b border-gray-700">
+                <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-semibold">
+                  LLM Model
+                </label>
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => setModel('gemini-3-flash-preview')}
+                    className={`text-left text-sm px-2 py-1 rounded ${model === 'gemini-3-flash-preview' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                  >
+                    Gemini 3 Flash
+                  </button>
+                  <button
+                    onClick={() => setModel('gemini-2.5-pro')}
+                    className={`text-left text-sm px-2 py-1 rounded ${model === 'gemini-2.5-pro' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                  >
+                    Gemini 2.5 Pro
+                  </button>
+                </div>
+              </div>
+              <div className="px-4 py-2 text-xs text-gray-500 text-center">
+                App Version: {APP_VERSION}
+              </div>
+            </div>
+          )}
         </div>
       </header>
 

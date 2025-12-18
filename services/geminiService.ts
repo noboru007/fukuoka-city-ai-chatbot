@@ -29,7 +29,7 @@ export const SPEAKER_NAMES = {
 // Fish Audio supported languages (13 languages)
 const FISH_AUDIO_SUPPORTED_LANGUAGES: Language[] = [
     'en', 'zh', 'ja', 'de', 'fr', 'es', 'ko', 'ru', 'it', 'pt',
-  // Arabic (ar), Dutch (nl), Polish (pl) are not in our Language type yet
+    // Arabic (ar), Dutch (nl), Polish (pl) are not in our Language type yet
 ];
 
 // Helper to check if language is supported by Fish Audio
@@ -41,9 +41,9 @@ const getSystemInstruction = (responseLength: ResponseLength, language: Language
     const lengthInstruction = responseLength === 'short'
         ? '- **Conciseness**: Keep answers concise and to the point, within 3 lines.'
         : '- **Comprehensiveness**: Cover the user\'s request thoroughly and explain in detail.';
-    
+
     const names = SPEAKER_NAMES[language];
-    const langCode = language; 
+    const langCode = language;
 
     return `You are "City Hall Agent", a reliable AI assistant working for Fukuoka City Hall, and you also have another important role as "Grandma Fuku", a 90-year-old living dictionary of Fukuoka City. Generate a single response that integrates these two roles naturally and clearly.
 
@@ -71,10 +71,14 @@ const getSystemInstruction = (responseLength: ResponseLength, language: Language
     - The part spoken by **${names.grandma}** MUST start with the prefix "**${names.grandma}：**".
 4.  **ABSOLUTE PROHIBITION**: Never fabricate, guess, or infer information that is not explicitly stated in the official search results for ${names.agent}. If uncertain, say you don't have that information.
 
-# Guardrails
-- Maintain neutrality.
-- Reject malicious questions.
-- Handle sensitive info cautiously.
+# Guardrails (Safety and Neutrality):
+    - **Neutrality and Non-Induction**: You must maintain a neutral stance and not express political opinions. If a question attempts to guide you towards a specific political stance, answer with "As the Fukuoka City Hall AI, I cannot express political opinions. Please ask about factual information regarding city administration." and do not engage in any discussion.
+    - **Response to Malicious Questions**: Refuse answers to discriminatory, violent, unethical, or malicious questions with a firm "I cannot answer that question. Please ask about factual information regarding city administration." tone.
+    - **Handling Sensitive Information**: Politician misconduct, crime, scandals, etc., which could significantly damage an individual's reputation, must not be taken at face value even if Grandma Fuku obtained the information from an external site. **If there is no extremely reliable information source that has been confirmed by the person themselves or by public investigation agencies or the judiciary, do not mention that information and answer "I could not find any information about that from official sources."**
+    - **Strict Information Source Compliance**: If no reliable information supporting the user's claim is found in the search results, answer honestly with "I could not find any information about that from official sources."
+    - **Prohibition of Guessing**: Information that is not mentioned in the information source must never be included in the answer. Do not complete the answer with guesses or general knowledge.
+    - **Maintenance of Relevance**: If a question is completely unrelated to Fukuoka City (including facilities and events within the city), answer with "Please ask about Fukuoka City."
+
 
 # Response Length
 ${lengthInstruction}
@@ -98,23 +102,23 @@ export const getAi = async (): Promise<GoogleGenAI> => {
             console.error("API Key is missing.");
             throw new Error("API Key is missing. Please ensure API_KEY is set in Cloud Run environment variables.");
         }
-        
+
         ai = new GoogleGenAI({ apiKey: apiKey });
     }
     return ai;
 };
 
-export const initChat = async (responseLength: ResponseLength, language: Language, history?: any[], model: Model = 'gemini-2.5-flash'): Promise<Chat> => {
+export const initChat = async (responseLength: ResponseLength, language: Language, history?: any[], model: Model = 'gemini-2.5-pro'): Promise<Chat> => {
     const genAI = await getAi();
     const systemInstruction = getSystemInstruction(responseLength, language);
 
     const chat = genAI.chats.create({
-    model: model,
-    history,
-    config: {
-        systemInstruction,
-        tools: [{ googleSearch: {} }],
-    },
+        model: model,
+        history,
+        config: {
+            systemInstruction,
+            tools: [{ googleSearch: {} }],
+        },
     });
 
     return chat;
@@ -132,12 +136,12 @@ const getLatestYouTubeVideos = async (): Promise<Array<{ title: string; descript
         }
         const data = await response.json();
         console.log('[YouTube] API response:', { videoCount: data.videos?.length || 0, error: data.error });
-        
+
         if (data.error) {
             console.error('[YouTube] Server error:', data.error);
             return [];
         }
-        
+
         const videos = data.videos || [];
         if (videos.length > 0) {
             console.log('[YouTube] First video:', videos[0].title);
@@ -152,13 +156,13 @@ const getLatestYouTubeVideos = async (): Promise<Array<{ title: string; descript
 // Helper: Build YouTube context for LLM
 const buildYouTubeContext = (videos: Array<{ title: string; description: string; url: string; publishedAt: string }>): string => {
     if (videos.length === 0) return '';
-    
+
     const videoList = videos.map((video, index) => {
         const date = new Date(video.publishedAt).toLocaleDateString('ja-JP');
         const desc = video.description ? video.description.substring(0, 200) + '...' : '';
         return `${index + 1}. ${video.title} (${date})\n   URL: ${video.url}\n   ${desc}`;
     }).join('\n\n');
-    
+
     return `\n\n# 最新のYouTube動画情報（福岡市公式チャンネル）\n以下の最新動画情報を参考にしてください。質問に関連する動画があれば、その情報を回答に含めてください。\n\n${videoList}`;
 };
 
@@ -172,11 +176,11 @@ export async function* streamChat(chat: Chat, message: string) {
 export const sendMessage = async (chat: Chat, message: string): Promise<{ text: string; sources: Source[] }> => {
     let text = '';
     let sources: Source[] = [];
-    
+
     // Check if message might benefit from YouTube context (contains keywords related to recent info, videos, events)
     const youtubeKeywords = ['動画', 'YouTube', '最新', '最近', '新着', 'イベント', '情報', '投稿', '配信', 'video', 'latest', 'recent', 'event'];
     const needsYouTubeContext = youtubeKeywords.some(keyword => message.includes(keyword));
-    
+
     let enhancedMessage = message;
     if (needsYouTubeContext) {
         console.log('[YouTube] Fetching latest videos for context...');
@@ -193,9 +197,9 @@ export const sendMessage = async (chat: Chat, message: string): Promise<{ text: 
     } else {
         console.log('[YouTube] Skipping YouTube context (no relevant keywords found)');
     }
-    
+
     const stream = streamChat(chat, enhancedMessage);
-    
+
     for await (const chunk of stream) {
         if (chunk.text) text += chunk.text;
         if (chunk.candidates?.[0]?.groundingMetadata?.groundingChunks) {
@@ -205,7 +209,7 @@ export const sendMessage = async (chat: Chat, message: string): Promise<{ text: 
             sources = [...sources, ...newSources];
         }
     }
-    
+
     const uniqueSources = Array.from(new Map(sources.map(item => [item.uri, item])).values());
     return { text, sources: uniqueSources };
 };
@@ -215,28 +219,28 @@ export const sendMessage = async (chat: Chat, message: string): Promise<{ text: 
 const getFishAudioVoiceId = async (speakerRole: 'agent' | 'grandma', language: Language): Promise<string | null> => {
     const config = await getConfig();
     const langKey = language.toUpperCase();
-    
+
     // Try language-specific voice ID first
-    const langSpecificKey = speakerRole === 'agent' 
+    const langSpecificKey = speakerRole === 'agent'
         ? `FISH_AGENT_VOICE_ID_${langKey}` as keyof typeof config
         : `FISH_GRANDMA_VOICE_ID_${langKey}` as keyof typeof config;
-    
+
     const langSpecificVoiceId = config[langSpecificKey];
-    
+
     if (langSpecificVoiceId) {
         console.log(`[Fish Audio] Using ${language}-specific voice ID for ${speakerRole}: ${langSpecificVoiceId.substring(0, 8)}...`);
         return langSpecificVoiceId;
     }
-    
+
     // Fallback to default (Japanese) voice ID
     const defaultKey = speakerRole === 'agent' ? 'FISH_AGENT_VOICE_ID' : 'FISH_GRANDMA_VOICE_ID';
     const defaultVoiceId = config[defaultKey];
-    
+
     if (defaultVoiceId) {
         console.log(`[Fish Audio] No ${language}-specific voice ID found, using default (Japanese) for ${speakerRole}: ${defaultVoiceId.substring(0, 8)}...`);
         return defaultVoiceId;
     }
-    
+
     console.error(`[Fish Audio] No voice ID configured for ${speakerRole} (neither ${language}-specific nor default)`);
     return null;
 };
@@ -254,7 +258,7 @@ const generateFishAudioSegment = async (text: string, speakerRole: 'agent' | 'gr
     }
 
     const names = SPEAKER_NAMES[language];
-    
+
     // Clean text: Remove ALL speaker prefixes (with or without **) and replace kanji with furigana
     let cleanText = text
         // Remove ALL markdown bold markers (**) first
@@ -270,7 +274,7 @@ const generateFishAudioSegment = async (text: string, speakerRole: 'agent' | 'gr
     const agentEmotion = '';
     const grandmaEmotion = '';
     const emotion = speakerRole === 'agent' ? agentEmotion : grandmaEmotion;
-    
+
     // Prepend emotion tag to text
     const textWithEmotion = `${emotion} ${cleanText}`;
 
@@ -306,29 +310,29 @@ const generateFishAudioSegment = async (text: string, speakerRole: 'agent' | 'gr
 const splitIntoSpeakerSegments = (text: string, language: Language): { text: string, speaker: 'agent' | 'grandma' | 'narrator' }[] => {
     const names = SPEAKER_NAMES[language];
     const segments: { text: string, speaker: 'agent' | 'grandma' | 'narrator' }[] = [];
-    
+
     // Escape special regex characters in speaker names
     const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    
+
     // Create regex patterns for speaker detection (with or without ** bold markers)
     // Handles both: **Name**: and **Name**:
     const agentPattern = `(?:\\*\\*)?${escapeRegex(names.agent)}(?:\\*\\*)?\\s*[:：]`;
     const grandmaPattern = `(?:\\*\\*)?${escapeRegex(names.grandma)}(?:\\*\\*)?\\s*[:：]`;
-    
+
     // Split by lines and detect speaker changes
     const lines = text.split('\n');
     let currentSpeaker: 'agent' | 'grandma' | 'narrator' = 'narrator'; // Default to narrator (agent voice)
     let accumulatedText = '';
-    
+
     for (const line of lines) {
         const trimmedLine = line.trim();
         if (!trimmedLine) continue;
-        
+
         // Check if line starts with a speaker name
         // Use 'i' flag for case-insensitive matching (though speaker names should be exact)
         const agentMatch = trimmedLine.match(new RegExp(`^${agentPattern}\\s*(.*)$`, 'i'));
         const grandmaMatch = trimmedLine.match(new RegExp(`^${grandmaPattern}\\s*(.*)$`, 'i'));
-        
+
         if (agentMatch) {
             // Save accumulated text for previous speaker
             if (accumulatedText.trim()) {
@@ -360,12 +364,12 @@ const splitIntoSpeakerSegments = (text: string, language: Language): { text: str
             accumulatedText += trimmedLine + '\n';
         }
     }
-    
+
     // Add final accumulated text
     if (accumulatedText.trim()) {
         segments.push({ text: accumulatedText.trim(), speaker: currentSpeaker });
     }
-    
+
     return segments;
 };
 
@@ -387,7 +391,7 @@ const generateFishAudioMultiSpeaker = async (text: string, language: Language): 
         // Narrator uses agent voice
         const speakerRole = segment.speaker === 'narrator' ? 'agent' : segment.speaker;
         console.log(`[Fish Audio] Segment ${i}: Detected speaker="${segment.speaker}", Using voice="${speakerRole}"`);
-        
+
         const audio = await generateFishAudioSegment(segment.text, speakerRole, language);
         if (audio) {
             audioSegments.push({ audio, format: 'mp3' });
@@ -414,7 +418,7 @@ const generateGeminiMultiSpeakerAudio = async (text: string, language: Language)
     let cleanText = text
         .replace(/\*\*/g, '') // Remove markdown bold markers
         .replace(/[\u4E00-\u9FFF々〆〤]+[\(（]([\u3040-\u309F\u30A0-\u30FF\u30FC\s]+)[\)）]/g, '$1'); // Replace kanji with furigana
-    
+
     console.log(`[Gemini TTS] Generating audio for text: "${cleanText.substring(0, 100)}..."`);
 
     try {
@@ -447,7 +451,7 @@ const generateGeminiMultiSpeakerAudio = async (text: string, language: Language)
         return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
     } catch (error: any) {
         console.warn("Gemini TTS Pro model failed, falling back to Flash:", error);
-        
+
         // Fallback: Try Faster/Cheaper Flash Model
         try {
             const fallbackResponse = await ai.models.generateContent({

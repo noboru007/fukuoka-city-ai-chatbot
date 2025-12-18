@@ -19,12 +19,12 @@ global.fetch = async (url, options = {}) => {
   if (urlStr.includes('googleapis.com')) {
     const newOptions = { ...options };
     const headers = new Headers(newOptions.headers || {});
-    
+
     // Add Referer header to match Google Cloud Console restrictions
     headers.set('Referer', CLOUD_RUN_URL);
     // Also add Origin for good measure
     headers.set('Origin', CLOUD_RUN_URL);
-    
+
     newOptions.headers = headers;
     return originalFetch(url, newOptions);
   }
@@ -47,7 +47,7 @@ app.use(express.json());
 
 // Multer for file uploads
 import multer from 'multer';
-const upload = multer({ 
+const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
@@ -93,7 +93,7 @@ app.post('/api/ephemeral-token', async (req, res) => {
 
     // Use SDK to generate ephemeral token
     const { GoogleGenAI } = await import('@google/genai');
-    const client = new GoogleGenAI({ 
+    const client = new GoogleGenAI({
       apiKey: apiKey,
       httpOptions: { apiVersion: 'v1alpha' }
     });
@@ -117,8 +117,8 @@ app.post('/api/ephemeral-token', async (req, res) => {
   } catch (error) {
     console.error('[Ephemeral Token] Generation error:', error);
     console.error('[Ephemeral Token] Error stack:', error.stack);
-    res.status(500).json({ 
-      error: 'Internal server error', 
+    res.status(500).json({
+      error: 'Internal server error',
       message: error.message,
       details: error.toString()
     });
@@ -146,12 +146,12 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
     // Convert audio to base64 for inline data
     console.log('[Transcribe] Converting audio to base64...');
     const base64Audio = req.file.buffer.toString('base64');
-    
+
     console.log('[Transcribe] Generating transcription with inline audio...');
 
     // Generate transcription with inline audio (using gemini-2.0-flash which supports audio)
     const result = await genAI.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3-flash-preview',
       contents: [{
         parts: [
           {
@@ -187,7 +187,7 @@ app.post('/api/gemini', async (req, res) => {
     }
 
     const { endpoint, method = 'POST', body } = req.body;
-    
+
     if (!endpoint) {
       return res.status(400).json({ error: 'Missing endpoint' });
     }
@@ -222,17 +222,17 @@ app.post('/api/gemini', async (req, res) => {
 app.get('/api/youtube/debug', (req, res) => {
   const apiKey = process.env.API_KEY;
   const channelHandle = 'FukuokaCityChannel';
-  
+
   if (!apiKey) {
     return res.json({ error: 'API key not configured' });
   }
-  
+
   const urls = {
     primary: `https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${channelHandle}&key=${apiKey}`,
     fallback: `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(channelHandle)}&key=${apiKey}&maxResults=1`,
     note: 'Replace YOUR_API_KEY with your actual API key to test in browser'
   };
-  
+
   res.json(urls);
 });
 
@@ -252,11 +252,11 @@ app.get('/api/youtube', async (req, res) => {
     // Use channels.list with forHandle parameter (more reliable than search)
     // Note: forHandle requires the handle WITHOUT the @ symbol
     const channelListUrl = `https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${channelHandle}&key=${apiKey}`;
-    
+
     const channelResponse = await fetch(channelListUrl);
     let channelData;
     let channelId;
-    
+
     if (channelResponse.ok) {
       channelData = await channelResponse.json();
       if (channelData.items && channelData.items.length > 0) {
@@ -274,11 +274,11 @@ app.get('/api/youtube', async (req, res) => {
       console.error('[YouTube API] Channel lookup error:', channelResponse.status, channelResponse.statusText, errorData);
       console.warn('[YouTube API] Falling back to search method...');
     }
-    
+
     // If channel ID not found via forHandle, try search method
     if (!channelId) {
       console.warn('[YouTube API] Channel not found via forHandle, falling back to search method');
-      
+
       // Fallback: Try search method
       const channelSearchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(channelHandle)}&key=${apiKey}&maxResults=1`;
       const searchResponse = await fetch(channelSearchUrl);
@@ -292,7 +292,7 @@ app.get('/api/youtube', async (req, res) => {
       channelId = searchData.items[0].snippet.channelId;
       console.log('[YouTube API] Found channel ID via search:', channelId);
     }
-    
+
     if (!channelId) {
       return res.json({ videos: [], error: 'Failed to find channel ID' });
     }
@@ -302,21 +302,21 @@ app.get('/api/youtube', async (req, res) => {
     const twoYearsAgo = new Date();
     twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
     const publishedAfter = twoYearsAgo.toISOString();
-    
+
     const videosUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&publishedAfter=${publishedAfter}&maxResults=${maxResults}&key=${apiKey}`;
-    
+
     console.log(`[YouTube API] Fetching videos published after: ${publishedAfter}`);
-    
+
     let videosResponse = await fetch(videosUrl);
     let videosData;
-    
+
     if (!videosResponse.ok) {
       const errorData = await videosResponse.json();
       throw new Error(`YouTube API error: ${JSON.stringify(errorData)}`);
     }
 
     videosData = await videosResponse.json();
-    
+
     // If no recent videos found, try without publishedAfter filter (get all videos)
     if (!videosData.items || videosData.items.length === 0) {
       console.warn('[YouTube API] No recent videos found, fetching all videos...');
@@ -348,7 +348,7 @@ app.get('/api/youtube', async (req, res) => {
 app.post('/api/fish-tts', async (req, res) => {
   try {
     const { text, reference_id } = req.body;
-    
+
     if (!text || !reference_id) {
       return res.status(400).json({ error: 'Missing text or reference_id' });
     }
@@ -378,7 +378,7 @@ app.post('/api/fish-tts', async (req, res) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`Fish Audio API error (${response.status}):`, errorText);
-      return res.status(response.status).json({ 
+      return res.status(response.status).json({
         error: `Fish Audio API error: ${response.statusText}`,
         details: errorText
       });
@@ -387,7 +387,7 @@ app.post('/api/fish-tts', async (req, res) => {
     // Stream the audio response
     const audioBuffer = await response.arrayBuffer();
     const base64Audio = Buffer.from(audioBuffer).toString('base64');
-    
+
     res.json({ audio: base64Audio });
   } catch (error) {
     console.error('Fish Audio proxy error:', error);
