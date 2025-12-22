@@ -8,12 +8,12 @@ const App: React.FC = () => {
   const [fontSize, setFontSize] = useState<FontSize>('md');
   const [responseLength, setResponseLength] = useState<ResponseLength>('short');
   const [language, setLanguage] = useState<Language>('ja');
-  const [model, setModel] = useState<Model>('gemini-2.5-pro');
+  const [model, setModel] = useState<Model>('gemini-3-flash-preview');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Updated version for verification
-  const APP_VERSION = "v0.57"; // Add LLM model selector (Gemini 3 Flash/Pro) in hamburger menu
+  const APP_VERSION = "v0.58"; // Add Gemini 3 Pro Support
 
   // Log version on component mount
   useEffect(() => {
@@ -194,6 +194,12 @@ const App: React.FC = () => {
                   LLM Model
                 </label>
                 <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => setModel('gemini-3-pro-preview')}
+                    className={`text-left text-sm px-2 py-1 rounded ${model === 'gemini-3-pro-preview' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                  >
+                    Gemini 3 Pro
+                  </button>
                   <button
                     onClick={() => setModel('gemini-3-flash-preview')}
                     className={`text-left text-sm px-2 py-1 rounded ${model === 'gemini-3-flash-preview' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}

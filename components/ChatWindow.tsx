@@ -35,7 +35,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
     const setupChat = async () => {
       setIsLoading(true);
       try {
-        const chatSession = await initChat(responseLength, language, undefined, model);
+        const chatSession = await initChat(responseLength, language, model);
         setChat(chatSession);
 
         const t = translations[language];

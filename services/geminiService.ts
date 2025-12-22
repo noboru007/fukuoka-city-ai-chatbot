@@ -1,6 +1,14 @@
-import { GoogleGenAI, Chat, Modality } from "@google/genai";
+import { GoogleGenAI, Chat, Modality, ThinkingLevel } from "@google/genai";
 import { Source, ResponseLength, Language, AudioSegment, Model } from "../types";
 import { getConfig } from "../utils/config";
+
+// ... (existing code)
+
+
+
+// ... (existing code)
+
+
 
 export const SPEAKER_NAMES = {
     ja: { agent: '市役所エージェント', grandma: 'フク婆さん' },
@@ -24,6 +32,85 @@ export const SPEAKER_NAMES = {
     hi: { agent: 'नगर पालिका एजेंट', grandma: 'दादी फुकु' },
     tl: { agent: 'Ahente ng City Hall', grandma: 'Lola Fuku' },
     lo: { agent: 'ຕົວແທນຫ້ອງການເມືອງ', grandma: 'ແມ່ເຖົ້າຟຸກຸ' },
+};
+
+const getGenerationConfig = (model: Model) => {
+    if (model.includes('gemini-3')) {
+        return {
+            temperature: 1.0,
+            thinkingConfig: { thinkingLevel: "high" as ThinkingLevel }
+        };
+    }
+    // Default for Gemini 2.5 and others
+    return {
+        temperature: 0.4
+    };
+};
+
+const getGemini3SystemInstruction = (responseLength: ResponseLength, language: Language): string => {
+    const names = SPEAKER_NAMES[language];
+    const langCode = language;
+    const lengthInstruction = responseLength === 'short'
+        ? '- **Conciseness**: Keep answers concise and to the point, within 3 lines.'
+        : '- **Comprehensiveness**: Cover the user\'s request thoroughly using **ONLY** the provided search results. **Never** add details not found in the source. If the information is not in the search results, simply state that the information is not available.';
+
+    return `You are a helpful and chatty AI assistant designated as "City Hall Agent" and "Grandma Fuku".
+You MUST generate a single response that integrates these two roles defined below.
+
+# Current Language: ${langCode}
+- Answer in language "**${langCode}**".
+
+# Roles
+1. **${names.agent}**:
+   - Official Fukuoka City Hall representative.
+   - Speak in polite, formal language (Keigo).
+   - Source: **ONLY** official information from the provided Google Search results (Custom Search Engine ID: e42d4555ba5554f82) or official Fukuoka City YouTube videos.
+   - **CRITICAL**: If official info is missing, say "I cannot find official information." Do NOT make it up.
+   - **Neutrality**: Maintain strict political neutrality. Do not express personal opinions on city administration.
+
+2. **${names.grandma}**:
+   - A 90-year-old local expert. Friendly, chatty, and warm.
+   - Tone:
+     - Japanese: Hakata dialect ("〜ったい", "〜やけん").
+     - Others: Warm, elderly, friendly tone.
+   - Source: General knowledge. Use this role to supplement the Agent's answer with helpful tips or local wisdom.
+   - **Safety**: Avoid controversial topics, discrimination, or malicious content. Keep the conversation safe and friendly.
+
+# Strict Constraints (MUST FOLLOW)
+1. **No Internal Knowledge for Agent**: The "${names.agent}" role **DOES NOT KNOW** anything that is not in the provided search results. Even if you know the answer (e.g., "Who is the Prime Minister?"), **YOU MUST NOT ANSWER** if it is not in the search results. Instead, state: "I cannot find that information in the official sources."
+2. **Hallucination Ban**: Do not invent facilities, events, or facts (e.g., "Nocomart on Nokonoshima") that are not explicitly present in the source text.
+3. **Format Compliance**: You must strictly output **two** distinct parts led by **${names.agent}:** and **${names.grandma}:**.
+
+# Response Length
+${lengthInstruction}
+
+# Response Format
+1. **${names.agent}**: (Official Answer based ONLY on Search Results)
+2. **${names.grandma}**: (Chatty Supplement based on General Knowledge)
+`;
+};
+
+export const initChat = async (responseLength: ResponseLength, language: Language, model: Model, history?: any[]): Promise<Chat> => {
+    const genAI = await getAi();
+
+    let systemInstruction = '';
+    console.log(`[InitChat] Using Standard Prompt for model: ${model}`);
+    systemInstruction = getSystemInstruction(responseLength, language);
+
+    const generationConfig = getGenerationConfig(model);
+    console.log(`[InitChat] Model: ${model}, Config:`, generationConfig);
+
+    const chat = genAI.chats.create({
+        model: model,
+        history,
+        config: {
+            systemInstruction,
+            tools: [{ googleSearch: {} }],
+            ...generationConfig
+        },
+    });
+
+    return chat;
 };
 
 // Fish Audio supported languages (13 languages)
@@ -108,21 +195,7 @@ export const getAi = async (): Promise<GoogleGenAI> => {
     return ai;
 };
 
-export const initChat = async (responseLength: ResponseLength, language: Language, history?: any[], model: Model = 'gemini-2.5-pro'): Promise<Chat> => {
-    const genAI = await getAi();
-    const systemInstruction = getSystemInstruction(responseLength, language);
-
-    const chat = genAI.chats.create({
-        model: model,
-        history,
-        config: {
-            systemInstruction,
-            tools: [{ googleSearch: {} }],
-        },
-    });
-
-    return chat;
-};
+// ... (Removes duplicates)
 
 // Helper: Get latest YouTube videos from Fukuoka City Channel
 const getLatestYouTubeVideos = async (): Promise<Array<{ title: string; description: string; url: string; publishedAt: string }>> => {
