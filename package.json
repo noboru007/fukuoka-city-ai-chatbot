@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --skipLibCheck && vite build",
     "preview": "vite preview",
-    "start": "node server.js"
+    "start": "node server.js",
+    "deploy": "gcloud builds submit --config cloudbuild.yaml ."
   },
   "dependencies": {
     "@google/genai": "^1.0.0",
@@ -25,6 +26,7 @@
     "@types/react-dom": "^18.2.19",
     "@vitejs/plugin-react": "^4.2.1",
     "typescript": "^5.2.2",
-    "vite": "^5.1.0"
+    "vite": "^5.1.0",
+    "vite-plugin-pwa": "^1.2.0"
   }
 }
