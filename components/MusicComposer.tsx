@@ -34,7 +34,8 @@ const uiTranslations = {
         errorLyrics: '歌詞の生成に失敗しました',
         errorComposition: '作曲の開始に失敗しました',
         errorGenFailed: '生成に失敗しました',
-        convertKana: '漢字をかなに変換して作曲'
+        convertKana: '漢字をかなに変換して作曲',
+        model: 'モデル'
     },
     en: {
         headerTitle: 'AI Song Composer',
@@ -57,7 +58,8 @@ const uiTranslations = {
         errorLyrics: 'Failed to generate lyrics',
         errorComposition: 'Failed to start song generation',
         errorGenFailed: 'Generation failed',
-        convertKana: 'Convert Kanji to Kana for singing'
+        convertKana: 'Convert Kanji to Kana for singing',
+        model: 'Model'
     }
 };
 
@@ -75,6 +77,7 @@ const MusicComposer: React.FC<MusicComposerProps> = ({ isOpen, onClose, initialP
     const [isPlaying, setIsPlaying] = useState(false);
     // Default to true for better singing results in JA
     const [convertKana, setConvertKana] = useState(true);
+    const [model, setModel] = useState('mureka-o2');
 
     const t = language === 'ja' ? uiTranslations.ja : uiTranslations.en;
 
@@ -131,9 +134,9 @@ const MusicComposer: React.FC<MusicComposerProps> = ({ isOpen, onClose, initialP
             }
 
             const fullStyle = `${style}, ${gender} vocals`;
-            console.log('[MusicComposer] Starting composition:', { fullStyle });
+            console.log('[MusicComposer] Starting composition:', { fullStyle, model });
             // Send the converted lyrics (if applicable) to Mureka, but keep original lyrics in UI
-            const id = await generateSong(finalLyrics, fullStyle);
+            const id = await generateSong(finalLyrics, fullStyle, model);
             console.log('[MusicComposer] Task ID received:', id);
             setTaskId(id);
             pollStatus(id);
@@ -346,6 +349,18 @@ const MusicComposer: React.FC<MusicComposerProps> = ({ isOpen, onClose, initialP
                                         <option value="Male">{t.male}</option>
                                     </select>
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs uppercase text-gray-400 font-semibold mb-1">{t.model}</label>
+                                <select
+                                    value={model}
+                                    onChange={(e) => setModel(e.target.value)}
+                                    className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white text-sm"
+                                >
+                                    <option value="mureka-o2">Mureka O2 (Fast & Balanced)</option>
+                                    <option value="mureka-8">Mureka 8 (High Quality)</option>
+                                </select>
                             </div>
 
                             <button

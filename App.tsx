@@ -13,7 +13,7 @@ const App: React.FC = () => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Updated version for verification
-  const APP_VERSION = "v0.58"; // Add Gemini 3 Pro Support
+  const APP_VERSION = "v0.61"; // PWA Disabled & Cache-Control fix
 
   // Log version on component mount
   useEffect(() => {
