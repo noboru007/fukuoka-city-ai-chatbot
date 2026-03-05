@@ -2,7 +2,6 @@
 // Fetches environment variables from server at runtime
 
 interface Config {
-  API_KEY: string | null;
   FISH_API_KEY: string | null;
   FISH_AGENT_VOICE_ID: string | null;
   FISH_GRANDMA_VOICE_ID: string | null;
@@ -46,7 +45,6 @@ export const getConfig = async (): Promise<Config> => {
       cachedConfig = config;
       configPromise = null;
       console.log('[Config] Loaded runtime config:', {
-        API_KEY: config.API_KEY ? 'YES' : 'NO',
         FISH_API_KEY: config.FISH_API_KEY ? 'YES' : 'NO',
       });
       return config;

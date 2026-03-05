@@ -5,7 +5,6 @@ const router = express.Router();
 // Environment variables endpoint (for frontend to fetch API keys)
 router.get('/config', (req, res) => {
     const config = {
-        API_KEY: process.env.API_KEY || null,
         FISH_API_KEY: process.env.FISH_API_KEY || null,
         FISH_AGENT_VOICE_ID: process.env.FISH_AGENT_VOICE_ID || null,
         FISH_GRANDMA_VOICE_ID: process.env.FISH_GRANDMA_VOICE_ID || null,
@@ -25,7 +24,6 @@ router.get('/config', (req, res) => {
     };
 
     console.log('[Config API] Serving config to frontend:', {
-        API_KEY: config.API_KEY ? 'YES' : 'NO',
         FISH_API_KEY: config.FISH_API_KEY ? 'YES' : 'NO',
     });
 

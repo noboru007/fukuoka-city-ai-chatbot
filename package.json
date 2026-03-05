@@ -8,6 +8,7 @@
     "build": "tsc --skipLibCheck && vite build",
     "preview": "vite preview",
     "start": "node server.js",
+    "test": "vitest run",
     "deploy": "gcloud builds submit --config cloudbuild.yaml ."
   },
   "dependencies": {
@@ -27,6 +28,7 @@
     "@vitejs/plugin-react": "^4.2.1",
     "typescript": "^5.2.2",
     "vite": "^5.1.0",
-    "vite-plugin-pwa": "^1.2.0"
+    "vite-plugin-pwa": "^1.2.0",
+    "vitest": "^4.0.18"
   }
 }

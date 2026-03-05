@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { Chat } from '@google/genai';
 import { initChat, streamChat, SPEAKER_NAMES } from '../services/geminiService';
 import { generateMultiSpeakerAudio } from '../services/ttsService';
 import type { Message as MessageType, ResponseLength, Language, Source, Model } from '../types';
@@ -7,10 +6,6 @@ import Message from './Message';
 import UserInput from './UserInput';
 import MusicComposer from './MusicComposer';
 import { translations } from '../utils/translations';
-
-interface GroundingChunk {
-  web?: { uri: string; title?: string };
-}
 
 let messageIdCounter = 0;
 const generateMessageId = () => `msg-${Date.now()}-${++messageIdCounter}`;
@@ -22,7 +17,7 @@ interface ChatWindowProps {
 }
 
 const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model }) => {
-  const [chat, setChat] = useState<Chat | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isMusicComposerOpen, setIsMusicComposerOpen] = useState(false);
@@ -43,8 +38,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
     const setupChat = async () => {
       setIsLoading(true);
       try {
-        const chatSession = await initChat(responseLength, language, model);
-        setChat(chatSession);
+        const newSessionId = await initChat(responseLength, language, model);
+        setSessionId(newSessionId);
 
         const t = translations[language];
         const initialMsg: MessageType = {
@@ -68,7 +63,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
   }, [responseLength, language, model]);
 
   const handleSendMessage = async (userInput: string) => {
-    if (!chat || userInput.trim() === '') return;
+    if (!sessionId || userInput.trim() === '') return;
 
     const userMessage: MessageType = { id: generateMessageId(), role: 'user', content: userInput };
     setMessages(prev => [...prev, userMessage]);
@@ -90,100 +85,93 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
     let collectedSources: Source[] = [];
 
     try {
-      const stream = streamChat(chat, userInput);
+      const stream = streamChat(sessionId, userInput);
 
       for await (const chunk of stream) {
-        let shouldUpdate = false;
-
-        // Extract sources FIRST so they are available for the text update
-        if (chunk.candidates?.[0]?.groundingMetadata?.groundingChunks) {
-          const newSources = chunk.candidates[0].groundingMetadata.groundingChunks
-            .filter((c: GroundingChunk) => c.web && c.web.uri)
-            .map((c: GroundingChunk) => ({ uri: c.web!.uri, title: c.web!.title || '' }));
-
-          if (newSources.length > 0) {
-            collectedSources = [...collectedSources, ...newSources];
-            collectedSources = Array.from(new Map(collectedSources.map(item => [item.uri, item])).values());
-            shouldUpdate = true;
-          }
-        }
-
-        if (chunk.text) {
+        if (chunk.type === 'text' && chunk.text) {
           fullText += chunk.text;
-          shouldUpdate = true;
-        }
-
-        // Single consolidated state update for text and/or sources
-        if (shouldUpdate) {
           setMessages(prev => {
             const newMsgs = [...prev];
             if (newMsgs[botMessageIndex]) {
               newMsgs[botMessageIndex] = {
                 ...newMsgs[botMessageIndex],
                 content: fullText,
-                sources: collectedSources
+                sources: collectedSources,
               };
             }
             return newMsgs;
           });
         }
+
+        if (chunk.type === 'sources' && chunk.sources) {
+          collectedSources = [...collectedSources, ...chunk.sources];
+          collectedSources = Array.from(new Map(collectedSources.map(item => [item.uri, item])).values());
+          setMessages(prev => {
+            const newMsgs = [...prev];
+            if (newMsgs[botMessageIndex]) {
+              newMsgs[botMessageIndex] = {
+                ...newMsgs[botMessageIndex],
+                content: fullText,
+                sources: collectedSources,
+              };
+            }
+            return newMsgs;
+          });
+        }
+
+        if (chunk.type === 'done') {
+          break;
+        }
       }
 
-    } catch (e) {
-      console.error("Error in stream:", e);
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      console.error("Streaming error:", error);
       setMessages(prev => {
         const newMsgs = [...prev];
         if (newMsgs[botMessageIndex]) {
           newMsgs[botMessageIndex] = {
             ...newMsgs[botMessageIndex],
-            isGeneratingAudio: false,
-            sources: collectedSources // Ensure sources are updated at the end
+            content: fullText || "An error occurred. Please try again.",
           };
         }
         return newMsgs;
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleGenerateAudio = async (messageIndex: number) => {
     const message = messages[messageIndex];
-    if (!message || !message.content) return;
+    if (!message || message.role !== 'model' || !message.content) return;
 
     setMessages(prev => {
       const newMsgs = [...prev];
-      newMsgs[messageIndex] = { ...newMsgs[messageIndex], isGeneratingAudio: true, audioSegments: [] };
+      newMsgs[messageIndex] = { ...newMsgs[messageIndex], isGeneratingAudio: true };
       return newMsgs;
     });
 
     try {
-      // Generate multi-speaker audio segments
       const audioSegments = await generateMultiSpeakerAudio(message.content, language);
 
       setMessages(prev => {
         const newMsgs = [...prev];
-        if (newMsgs[messageIndex]) {
-          newMsgs[messageIndex] = {
-            ...newMsgs[messageIndex],
-            audioSegments: audioSegments,
-            isGeneratingAudio: false
-          };
-        }
+        newMsgs[messageIndex] = {
+          ...newMsgs[messageIndex],
+          audioSegments: audioSegments,
+          isGeneratingAudio: false
+        };
         return newMsgs;
       });
-    } catch (e) {
-      console.error("Multi-speaker audio generation failed:", e);
+    } catch (error) {
+      console.error('Audio generation failed:', error);
       setMessages(prev => {
         const newMsgs = [...prev];
-        if (newMsgs[messageIndex]) {
-          newMsgs[messageIndex] = { ...newMsgs[messageIndex], isGeneratingAudio: false };
-        }
+        newMsgs[messageIndex] = { ...newMsgs[messageIndex], isGeneratingAudio: false };
         return newMsgs;
       });
     }
   };
-
 
   const handleComposeMusic = (content: string) => {
     setComposerPrompt(content);

@@ -60,9 +60,9 @@ const MusicComposer: React.FC<MusicComposerProps> = ({ isOpen, onClose, initialP
             setLyrics(data.lyrics);
             setTitle(data.title);
             setStep('lyrics');
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error('[MusicComposer] Lyrics generation error:', e);
-            setError(e.message || t.errorLyrics);
+            setError(e instanceof Error ? e.message : t.errorLyrics);
         } finally {
             setIsLoading(false);
         }
@@ -93,9 +93,9 @@ const MusicComposer: React.FC<MusicComposerProps> = ({ isOpen, onClose, initialP
             console.log('[MusicComposer] Task ID received:', id);
             setTaskId(id);
             pollStatus(id);
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error('[MusicComposer] Composition error:', e);
-            setError(e.message || t.errorComposition);
+            setError(e instanceof Error ? e.message : t.errorComposition);
             setStep('lyrics');
             setIsLoading(false);
         }

@@ -42,14 +42,18 @@ app.use(express.json());
 
 // --- Route Modules ---
 import configRoutes from './server/routes/config.js';
+import chatRoutes from './server/routes/chat.js';
 import geminiRoutes from './server/routes/gemini.js';
+import geminiTtsRoutes from './server/routes/geminiTts.js';
 import youtubeRoutes from './server/routes/youtube.js';
 import ttsRoutes from './server/routes/tts.js';
 import murekaRoutes from './server/routes/mureka.js';
 import proxyRoutes from './server/routes/proxy.js';
 
 app.use('/api', configRoutes);
+app.use('/api', chatRoutes);
 app.use('/api', geminiRoutes);
+app.use('/api', geminiTtsRoutes);
 app.use('/api', youtubeRoutes);
 app.use('/api', ttsRoutes);
 app.use('/api', murekaRoutes);

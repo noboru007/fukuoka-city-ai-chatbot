@@ -1,8 +1,24 @@
-import { GoogleGenAI, Chat, ThinkingLevel } from "@google/genai";
-import { Source, ResponseLength, Language, Model } from "../types";
-import { getConfig } from "../utils/config";
+import express from 'express';
+import { randomUUID } from 'crypto';
 
-export const SPEAKER_NAMES: Record<string, { agent: string; grandma: string }> = {
+const router = express.Router();
+
+// --- In-memory chat session store ---
+const chatSessions = new Map();
+
+// Auto-cleanup sessions older than 2 hours
+setInterval(() => {
+    const now = Date.now();
+    for (const [id, session] of chatSessions) {
+        if (now - session.createdAt > 2 * 60 * 60 * 1000) {
+            chatSessions.delete(id);
+            console.log(`[Chat] Cleaned up expired session: ${id}`);
+        }
+    }
+}, 10 * 60 * 1000); // Every 10 minutes
+
+// Speaker names (duplicated from frontend for server-side use)
+const SPEAKER_NAMES = {
     ja: { agent: '市役所エージェント', grandma: 'フク婆さん' },
     en: { agent: 'City Hall Agent', grandma: 'Grandma Fuku' },
     ko: { agent: '시청 에이전트', grandma: '후쿠 할머니' },
@@ -26,24 +42,19 @@ export const SPEAKER_NAMES: Record<string, { agent: string; grandma: string }> =
     lo: { agent: 'ຕົວແທນຫ້ອງການເມືອງ', grandma: 'ແມ່ເຖົ້າຟຸກຸ' },
 };
 
-const getGenerationConfig = (model: Model) => {
+function getGenerationConfig(model) {
     if (model.includes('gemini-3')) {
-        return {
-            temperature: 1.0,
-            thinkingConfig: { thinkingLevel: "high" as ThinkingLevel }
-        };
+        return { temperature: 1.0, thinkingConfig: { thinkingLevel: 'high' } };
     }
-    return {
-        temperature: 0.4
-    };
-};
+    return { temperature: 0.4 };
+}
 
-const getSystemInstruction = (responseLength: ResponseLength, language: Language): string => {
+function getSystemInstruction(responseLength, language) {
     const lengthInstruction = responseLength === 'short'
         ? '- **Conciseness**: Keep answers concise and to the point, within 3 lines.'
         : '- **Comprehensiveness**: Cover the user\'s request thoroughly and explain in detail.';
 
-    const names = SPEAKER_NAMES[language];
+    const names = SPEAKER_NAMES[language] || SPEAKER_NAMES['en'];
     const langCode = language;
 
     return `You are "City Hall Agent", a reliable AI assistant working for Fukuoka City Hall, and you also have another important role as "Grandma Fuku", a 90-year-old living dictionary of Fukuoka City. Generate a single response that integrates these two roles naturally and clearly.
@@ -89,132 +100,179 @@ ${lengthInstruction}
 2. **${names.grandma}**: (Answer)
 
 `;
-};
+}
 
-// --- AI Client Singleton ---
-let ai: GoogleGenAI | null = null;
+// Helper: Get latest YouTube videos (server-side fetch)
+async function getLatestYouTubeVideos(apiKey) {
+    try {
+        const channelHandle = 'FukuokaChannel';
+        const maxResults = 10;
 
-export const getAi = async (): Promise<GoogleGenAI> => {
-    if (!ai) {
-        const config = await getConfig();
-        const apiKey = config.API_KEY;
+        const channelListUrl = `https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${channelHandle}&key=${apiKey}`;
+        const channelResponse = await fetch(channelListUrl);
+        let channelId;
 
-        if (!apiKey) {
-            console.error("API Key is missing.");
-            throw new Error("API Key is missing. Please ensure API_KEY is set in Cloud Run environment variables.");
+        if (channelResponse.ok) {
+            const channelData = await channelResponse.json();
+            if (channelData.items && channelData.items.length > 0) {
+                channelId = channelData.items[0].id;
+            }
         }
 
-        ai = new GoogleGenAI({ apiKey: apiKey });
-    }
-    return ai;
-};
+        if (!channelId) return [];
 
-// --- Chat Functions ---
-export const initChat = async (responseLength: ResponseLength, language: Language, model: Model, history?: any[]): Promise<Chat> => {
-    const genAI = await getAi();
+        const twoYearsAgo = new Date();
+        twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+        const publishedAfter = twoYearsAgo.toISOString();
 
-    console.log(`[InitChat] Using Standard Prompt for model: ${model}`);
-    const systemInstruction = getSystemInstruction(responseLength, language);
+        const videosUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&publishedAfter=${publishedAfter}&maxResults=${maxResults}&key=${apiKey}`;
+        const videosResponse = await fetch(videosUrl);
+        if (!videosResponse.ok) return [];
 
-    const generationConfig = getGenerationConfig(model);
-    console.log(`[InitChat] Model: ${model}, Config:`, generationConfig);
+        const videosData = await videosResponse.json();
+        if (!videosData.items || videosData.items.length === 0) return [];
 
-    const chat = genAI.chats.create({
-        model: model,
-        history,
-        config: {
-            systemInstruction,
-            tools: [{ googleSearch: {} }],
-            ...generationConfig
-        },
-    });
-
-    return chat;
-};
-
-export async function* streamChat(chat: Chat, message: string) {
-    const result = await chat.sendMessageStream({ message });
-    for await (const chunk of result) {
-        yield chunk;
+        return videosData.items.map((item) => ({
+            title: item.snippet.title,
+            description: item.snippet.description,
+            url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
+            publishedAt: item.snippet.publishedAt,
+        }));
+    } catch (error) {
+        console.error('[Chat/YouTube] Error fetching videos:', error);
+        return [];
     }
 }
 
-// --- YouTube Integration ---
-const getLatestYouTubeVideos = async (): Promise<Array<{ title: string; description: string; url: string; publishedAt: string }>> => {
-    try {
-        console.log('[YouTube] Fetching from /api/youtube...');
-        const response = await fetch('/api/youtube');
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('[YouTube] API error:', response.status, response.statusText, errorText);
-            return [];
-        }
-        const data = await response.json();
-        console.log('[YouTube] API response:', { videoCount: data.videos?.length || 0, error: data.error });
-
-        if (data.error) {
-            console.error('[YouTube] Server error:', data.error);
-            return [];
-        }
-
-        const videos = data.videos || [];
-        if (videos.length > 0) {
-            console.log('[YouTube] First video:', videos[0].title);
-        }
-        return videos;
-    } catch (error) {
-        console.error('[YouTube] Fetch error:', error);
-        return [];
-    }
-};
-
-const buildYouTubeContext = (videos: Array<{ title: string; description: string; url: string; publishedAt: string }>): string => {
+function buildYouTubeContext(videos) {
     if (videos.length === 0) return '';
-
     const videoList = videos.map((video, index) => {
         const date = new Date(video.publishedAt).toLocaleDateString('ja-JP');
         const desc = video.description ? video.description.substring(0, 200) + '...' : '';
         return `${index + 1}. ${video.title} (${date})\n   URL: ${video.url}\n   ${desc}`;
     }).join('\n\n');
-
     return `\n\n# 最新のYouTube動画情報（福岡市公式チャンネル）\n以下の最新動画情報を参考にしてください。質問に関連する動画があれば、その情報を回答に含めてください。\n\n${videoList}`;
-};
+}
 
-export const sendMessage = async (chat: Chat, message: string): Promise<{ text: string; sources: Source[] }> => {
-    let text = '';
-    let sources: Source[] = [];
+// POST /api/chat/init - Create a new chat session
+router.post('/chat/init', async (req, res) => {
+    try {
+        const apiKey = process.env.API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({ error: 'Gemini API key not configured' });
+        }
 
-    const youtubeKeywords = ['動画', 'YouTube', '最新', '最近', '新着', 'イベント', '情報', '投稿', '配信', 'video', 'latest', 'recent', 'event'];
-    const needsYouTubeContext = youtubeKeywords.some(keyword => message.includes(keyword));
+        const { responseLength, language, model } = req.body;
+        if (!responseLength || !language || !model) {
+            return res.status(400).json({ error: 'Missing required fields: responseLength, language, model' });
+        }
 
-    let enhancedMessage = message;
-    if (needsYouTubeContext) {
-        console.log('[YouTube] Fetching latest videos for context...');
-        const videos = await getLatestYouTubeVideos();
-        console.log(`[YouTube] Received ${videos.length} videos from API`);
-        if (videos.length > 0) {
-            const youtubeContext = buildYouTubeContext(videos);
-            enhancedMessage = message + youtubeContext;
-            console.log(`[YouTube] Added context for ${videos.length} videos`);
+        const { GoogleGenAI } = await import('@google/genai');
+        const genAI = new GoogleGenAI({ apiKey });
+
+        const systemInstruction = getSystemInstruction(responseLength, language);
+        const generationConfig = getGenerationConfig(model);
+
+        const chat = genAI.chats.create({
+            model,
+            config: {
+                systemInstruction,
+                tools: [{ googleSearch: {} }],
+                ...generationConfig
+            },
+        });
+
+        const sessionId = randomUUID();
+        chatSessions.set(sessionId, {
+            chat,
+            language,
+            createdAt: Date.now(),
+        });
+
+        console.log(`[Chat] Session created: ${sessionId} (model: ${model}, lang: ${language})`);
+        res.json({ sessionId });
+
+    } catch (error) {
+        console.error('[Chat] Init error:', error);
+        res.status(500).json({ error: 'Failed to initialize chat', message: error.message });
+    }
+});
+
+// POST /api/chat/send - Send message and stream response via SSE
+router.post('/chat/send', async (req, res) => {
+    try {
+        const apiKey = process.env.API_KEY;
+        const { sessionId, message } = req.body;
+
+        if (!sessionId || !message) {
+            return res.status(400).json({ error: 'Missing sessionId or message' });
+        }
+
+        const session = chatSessions.get(sessionId);
+        if (!session) {
+            return res.status(404).json({ error: 'Session not found. Please reinitialize chat.' });
+        }
+
+        // Touch session to prevent cleanup
+        session.createdAt = Date.now();
+
+        // YouTube context enhancement (server-side)
+        const youtubeKeywords = ['動画', 'YouTube', '最新', '最近', '新着', 'イベント', '情報', '投稿', '配信', 'video', 'latest', 'recent', 'event'];
+        const needsYouTubeContext = youtubeKeywords.some(keyword => message.includes(keyword));
+
+        let enhancedMessage = message;
+        if (needsYouTubeContext && apiKey) {
+            console.log('[Chat] Fetching YouTube context for message...');
+            const videos = await getLatestYouTubeVideos(apiKey);
+            if (videos.length > 0) {
+                enhancedMessage = message + buildYouTubeContext(videos);
+                console.log(`[Chat] Added YouTube context (${videos.length} videos)`);
+            }
+        }
+
+        // Set up SSE headers
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no'); // For nginx
+        res.flushHeaders();
+
+        // Stream the response
+        const result = await session.chat.sendMessageStream({ message: enhancedMessage });
+
+        for await (const chunk of result) {
+            // Send text chunks
+            if (chunk.text) {
+                res.write(`data: ${JSON.stringify({ type: 'text', text: chunk.text })}\n\n`);
+            }
+
+            // Send grounding sources
+            if (chunk.candidates?.[0]?.groundingMetadata?.groundingChunks) {
+                const sources = chunk.candidates[0].groundingMetadata.groundingChunks
+                    .filter(c => c.web && c.web.uri)
+                    .map(c => ({ uri: c.web.uri, title: c.web.title || '' }));
+
+                if (sources.length > 0) {
+                    res.write(`data: ${JSON.stringify({ type: 'sources', sources })}\n\n`);
+                }
+            }
+        }
+
+        // Signal end of stream
+        res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+        res.end();
+
+    } catch (error) {
+        console.error('[Chat] Send error:', error);
+
+        // If headers already sent, send error via SSE
+        if (res.headersSent) {
+            res.write(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`);
+            res.end();
         } else {
-            console.warn('[YouTube] No videos found, proceeding without YouTube context');
-        }
-    } else {
-        console.log('[YouTube] Skipping YouTube context (no relevant keywords found)');
-    }
-
-    const stream = streamChat(chat, enhancedMessage);
-
-    for await (const chunk of stream) {
-        if (chunk.text) text += chunk.text;
-        if (chunk.candidates?.[0]?.groundingMetadata?.groundingChunks) {
-            const newSources = chunk.candidates[0].groundingMetadata.groundingChunks
-                .filter((c: any) => c.web && c.web.uri)
-                .map((c: any) => ({ uri: c.web.uri, title: c.web.title || '' }));
-            sources = [...sources, ...newSources];
+            res.status(500).json({ error: 'Failed to send message', message: error.message });
         }
     }
+});
 
-    const uniqueSources = Array.from(new Map(sources.map(item => [item.uri, item])).values());
-    return { text, sources: uniqueSources };
-};
+export default router;

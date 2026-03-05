@@ -221,11 +221,11 @@ const Message: React.FC<MessageProps> = ({ role, content, sources, audioSegments
                     strong: ({ node, ...props }) => {
                       // Robustly extract text from children to check against regex
                       // React children can be strings, arrays, or other elements
-                      const getText = (children: any): string => {
+                      const getText = (children: React.ReactNode): string => {
                         if (!children) return '';
                         if (typeof children === 'string') return children;
                         if (Array.isArray(children)) return children.map(getText).join('');
-                        if (children.props && children.props.children) return getText(children.props.children);
+                        if (React.isValidElement(children) && children.props.children) return getText(children.props.children);
                         return '';
                       };
 

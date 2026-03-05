@@ -1,7 +1,6 @@
-import { Modality } from "@google/genai";
 import { Language, AudioSegment } from "../types";
 import { getConfig } from "../utils/config";
-import { SPEAKER_NAMES, getAi } from "./geminiService";
+import { SPEAKER_NAMES } from "./geminiService";
 
 // Fish Audio supported languages
 const FISH_AUDIO_SUPPORTED_LANGUAGES: Language[] = [
@@ -117,10 +116,7 @@ export const splitIntoSpeakerSegments = (text: string, language: Language): { te
             }
             currentSpeaker = 'agent';
             const restOfLine = agentMatch[1].trim();
-            console.log(`[Speaker Detection] Line detected as AGENT: "${trimmedLine.substring(0, 40)}..." -> remaining: "${restOfLine.substring(0, 40)}..."`);
-            if (restOfLine) {
-                accumulatedText += restOfLine + '\n';
-            }
+            if (restOfLine) accumulatedText += restOfLine + '\n';
         } else if (grandmaMatch) {
             if (accumulatedText.trim()) {
                 segments.push({ text: accumulatedText.trim(), speaker: currentSpeaker });
@@ -128,10 +124,7 @@ export const splitIntoSpeakerSegments = (text: string, language: Language): { te
             }
             currentSpeaker = 'grandma';
             const restOfLine = grandmaMatch[1].trim();
-            console.log(`[Speaker Detection] Line detected as GRANDMA: "${trimmedLine.substring(0, 40)}..." -> remaining: "${restOfLine.substring(0, 40)}..."`);
-            if (restOfLine) {
-                accumulatedText += restOfLine + '\n';
-            }
+            if (restOfLine) accumulatedText += restOfLine + '\n';
         } else {
             accumulatedText += trimmedLine + '\n';
         }
@@ -149,96 +142,43 @@ const generateFishAudioMultiSpeaker = async (text: string, language: Language): 
     if (!text || !text.trim()) return [];
 
     const textSegments = splitIntoSpeakerSegments(text, language);
-    console.log(`[Fish Audio] Split into ${textSegments.length} segments:`);
-    textSegments.forEach((s, i) => {
-        console.log(`  [${i}] ${s.speaker}: "${s.text.substring(0, 50)}..."`);
-    });
+    console.log(`[Fish Audio] Split into ${textSegments.length} segments`);
 
     const audioSegments: AudioSegment[] = [];
     for (let i = 0; i < textSegments.length; i++) {
         const segment = textSegments[i];
         const speakerRole = segment.speaker === 'narrator' ? 'agent' : segment.speaker;
-        console.log(`[Fish Audio] Segment ${i}: Detected speaker="${segment.speaker}", Using voice="${speakerRole}"`);
 
         const audio = await generateFishAudioSegment(segment.text, speakerRole, language);
         if (audio) {
             audioSegments.push({ audio, format: 'mp3' });
-            console.log(`[Fish Audio] Segment ${i}: Audio generated successfully (${audio.length} chars)`);
-        } else {
-            console.warn(`[Fish Audio] Segment ${i}: Audio generation failed`);
         }
     }
 
-    console.log(`[Fish Audio] Total audio segments generated: ${audioSegments.length}`);
     return audioSegments;
 };
 
-// Multi-speaker TTS using Gemini
+// Gemini TTS via server proxy
 const generateGeminiMultiSpeakerAudio = async (text: string, language: Language): Promise<string | null> => {
     if (!text || !text.trim()) return null;
 
-    const ai = await getAi();
-    const names = SPEAKER_NAMES[language];
-
-    let cleanText = text
-        .replace(/\*\*/g, '')
-        .replace(/[\u4E00-\u9FFF々〆〤]+[\(（]([\u3040-\u309F\u30A0-\u30FF\u30FC\s]+)[\)）]/g, '$1');
-
-    console.log(`[Gemini TTS] Generating audio for text: "${cleanText.substring(0, 100)}..."`);
-
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-pro-preview-tts",
-            contents: [{ parts: [{ text: cleanText }] }],
-            config: {
-                responseModalities: [Modality.AUDIO],
-                speechConfig: {
-                    multiSpeakerVoiceConfig: {
-                        speakerVoiceConfigs: [
-                            {
-                                speaker: names.agent,
-                                voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } }
-                            },
-                            {
-                                speaker: names.grandma,
-                                voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Gacrux' } }
-                            }
-                        ]
-                    }
-                }
-            }
+        const response = await fetch('/api/gemini-tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, language }),
         });
-        return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
-    } catch (error: any) {
-        console.warn("Gemini TTS Pro model failed, falling back to Flash:", error);
 
-        try {
-            const fallbackResponse = await ai.models.generateContent({
-                model: "gemini-2.5-flash-preview-tts",
-                contents: [{ parts: [{ text: cleanText }] }],
-                config: {
-                    responseModalities: [Modality.AUDIO],
-                    speechConfig: {
-                        multiSpeakerVoiceConfig: {
-                            speakerVoiceConfigs: [
-                                {
-                                    speaker: names.agent,
-                                    voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Puck' } }
-                                },
-                                {
-                                    speaker: names.grandma,
-                                    voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Gacrux' } }
-                                }
-                            ]
-                        }
-                    }
-                }
-            });
-            return fallbackResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || null;
-        } catch (fallbackError) {
-            console.error("All Gemini TTS attempts failed:", fallbackError);
-            return null;
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Gemini TTS failed');
         }
+
+        const data = await response.json();
+        return data.audio;
+    } catch (error) {
+        console.error('[Gemini TTS] Error:', error);
+        return null;
     }
 };
 

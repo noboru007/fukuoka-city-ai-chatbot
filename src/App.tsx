@@ -3,7 +3,7 @@ import ChatWindow from './components/ChatWindow';
 import type { FontSize, ResponseLength, Language, Model } from './types';
 import { MenuIcon } from './components/Icons';
 import { translations } from './utils/translations';
-import packageJson from './package.json';
+import packageJson from '../package.json';
 
 const App: React.FC = () => {
   const [fontSize, setFontSize] = useState<FontSize>('md');
