@@ -1,6 +1,31 @@
 
 import type { Language } from '../types';
 
+interface MusicComposerTranslation {
+  headerTitle: string;
+  songTitle: string;
+  songTitlePlaceholder: string;
+  lyrics: string;
+  lyricsPlaceholder: string;
+  style: string;
+  stylePlaceholder: string;
+  vocal: string;
+  female: string;
+  male: string;
+  composeButton: string;
+  generatingLyrics: string;
+  generatingTitle: string;
+  generatingDesc: string;
+  download: string;
+  createAnother: string;
+  poweredBy: string;
+  errorLyrics: string;
+  errorComposition: string;
+  errorGenFailed: string;
+  convertKana: string;
+  model: string;
+}
+
 interface Translation {
   title: string;
   online: string;
@@ -18,7 +43,10 @@ interface Translation {
     short: string;
     long: string;
   };
+  musicComposer?: MusicComposerTranslation;
 }
+
+export type { MusicComposerTranslation };
 
 export const translations: Record<Language, Translation> = {
   ja: {
@@ -37,6 +65,30 @@ export const translations: Record<Language, Translation> = {
       lg: '大',
       short: '短め',
       long: '長め',
+    },
+    musicComposer: {
+      headerTitle: 'AIソング作曲',
+      songTitle: '曲のタイトル',
+      songTitlePlaceholder: 'タイトルを入力',
+      lyrics: '歌詞',
+      lyricsPlaceholder: '歌詞を生成中...',
+      style: 'スタイル',
+      stylePlaceholder: '例: J-Pop, ロック, バラード',
+      vocal: 'ボーカル',
+      female: '女性',
+      male: '男性',
+      composeButton: '作曲する',
+      generatingLyrics: '歌詞を生成中...',
+      generatingTitle: '作曲中...',
+      generatingDesc: 'AIがメロディと歌声を生成しています。通常1分ほどかかります。',
+      download: '音声をダウンロード',
+      createAnother: '別の曲を作る',
+      poweredBy: 'Powered by Mureka API. 生成には1〜2分かかります。',
+      errorLyrics: '歌詞の生成に失敗しました',
+      errorComposition: '作曲の開始に失敗しました',
+      errorGenFailed: '生成に失敗しました',
+      convertKana: '漢字をかなに変換して作曲',
+      model: 'モデル'
     }
   },
   en: {
@@ -55,6 +107,30 @@ export const translations: Record<Language, Translation> = {
       lg: 'Large',
       short: 'Short',
       long: 'Long',
+    },
+    musicComposer: {
+      headerTitle: 'AI Song Composer',
+      songTitle: 'Song Title',
+      songTitlePlaceholder: 'Song Title',
+      lyrics: 'Lyrics',
+      lyricsPlaceholder: 'Generating lyrics...',
+      style: 'Style',
+      stylePlaceholder: 'e.g. J-Pop, Rock, Ballad',
+      vocal: 'Vocal',
+      female: 'Female',
+      male: 'Male',
+      composeButton: 'Compose Song',
+      generatingLyrics: 'Generating Lyrics...',
+      generatingTitle: 'Composing your song...',
+      generatingDesc: 'The AI is producing the melody and vocals. This usually takes about a minute.',
+      download: 'Download Audio',
+      createAnother: 'Create Another Version',
+      poweredBy: 'Powered by Mureka API. Generation takes 1-2 minutes.',
+      errorLyrics: 'Failed to generate lyrics',
+      errorComposition: 'Failed to start song generation',
+      errorGenFailed: 'Generation failed',
+      convertKana: 'Convert Kanji to Kana for singing',
+      model: 'Model'
     }
   },
   ko: {

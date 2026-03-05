@@ -3,6 +3,7 @@ import ChatWindow from './components/ChatWindow';
 import type { FontSize, ResponseLength, Language, Model } from './types';
 import { MenuIcon } from './components/Icons';
 import { translations } from './utils/translations';
+import packageJson from './package.json';
 
 const App: React.FC = () => {
   const [fontSize, setFontSize] = useState<FontSize>('md');
@@ -12,8 +13,7 @@ const App: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Updated version for verification
-  const APP_VERSION = "v0.61"; // PWA Disabled & Cache-Control fix
+  const APP_VERSION = `v${packageJson.version}`;
 
   // Log version on component mount
   useEffect(() => {
@@ -195,10 +195,10 @@ const App: React.FC = () => {
                 </label>
                 <div className="flex flex-col gap-1">
                   <button
-                    onClick={() => setModel('gemini-3-pro-preview')}
-                    className={`text-left text-sm px-2 py-1 rounded ${model === 'gemini-3-pro-preview' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                    onClick={() => setModel('gemini-3.1-pro-preview')}
+                    className={`text-left text-sm px-2 py-1 rounded ${model === 'gemini-3.1-pro-preview' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
                   >
-                    Gemini 3 Pro
+                    Gemini 3.1 Pro
                   </button>
                   <button
                     onClick={() => setModel('gemini-3-flash-preview')}
@@ -207,8 +207,8 @@ const App: React.FC = () => {
                     Gemini 3 Flash
                   </button>
                   <button
-                    onClick={() => setModel('gemini-2.5-pro')}
-                    className={`text-left text-sm px-2 py-1 rounded ${model === 'gemini-2.5-pro' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                    onClick={() => setModel('gemini-3-pro')}
+                    className={`text-left text-sm px-2 py-1 rounded ${model === 'gemini-3-pro' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
                   >
                     Gemini 2.5 Pro
                   </button>

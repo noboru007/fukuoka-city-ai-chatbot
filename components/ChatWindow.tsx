@@ -1,11 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Chat } from '@google/genai';
-import { initChat, streamChat, generateMultiSpeakerAudio, SPEAKER_NAMES } from '../services/geminiService';
+import { initChat, streamChat, SPEAKER_NAMES } from '../services/geminiService';
+import { generateMultiSpeakerAudio } from '../services/ttsService';
 import type { Message as MessageType, ResponseLength, Language, Source, Model } from '../types';
 import Message from './Message';
 import UserInput from './UserInput';
 import MusicComposer from './MusicComposer';
 import { translations } from '../utils/translations';
+
+interface GroundingChunk {
+  web?: { uri: string; title?: string };
+}
+
+let messageIdCounter = 0;
+const generateMessageId = () => `msg-${Date.now()}-${++messageIdCounter}`;
 
 interface ChatWindowProps {
   responseLength: ResponseLength;
@@ -40,6 +48,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
 
         const t = translations[language];
         const initialMsg: MessageType = {
+          id: generateMessageId(),
           role: 'model',
           content: t.initialMessage,
           isGeneratingAudio: false,
@@ -49,7 +58,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
 
       } catch (error) {
         console.error("Failed to initialize chat:", error);
-        setMessages([{ role: 'model', content: "Initialization failed. Please reload." }]);
+        setMessages([{ id: generateMessageId(), role: 'model', content: "Initialization failed. Please reload." }]);
       } finally {
         setIsLoading(false);
       }
@@ -61,12 +70,13 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
   const handleSendMessage = async (userInput: string) => {
     if (!chat || userInput.trim() === '') return;
 
-    const userMessage: MessageType = { role: 'user', content: userInput };
+    const userMessage: MessageType = { id: generateMessageId(), role: 'user', content: userInput };
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
 
     const botMessageIndex = messages.length + 1;
     setMessages(prev => [...prev, {
+      id: generateMessageId(),
       role: 'model',
       content: '',
       sources: [],
@@ -88,8 +98,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
         // Extract sources FIRST so they are available for the text update
         if (chunk.candidates?.[0]?.groundingMetadata?.groundingChunks) {
           const newSources = chunk.candidates[0].groundingMetadata.groundingChunks
-            .filter((c: any) => c.web && c.web.uri)
-            .map((c: any) => ({ uri: c.web.uri, title: c.web.title || '' }));
+            .filter((c: GroundingChunk) => c.web && c.web.uri)
+            .map((c: GroundingChunk) => ({ uri: c.web!.uri, title: c.web!.title || '' }));
 
           if (newSources.length > 0) {
             collectedSources = [...collectedSources, ...newSources];
@@ -99,24 +109,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
         }
 
         if (chunk.text) {
-          const newText = chunk.text;
-          fullText += newText;
+          fullText += chunk.text;
           shouldUpdate = true;
-
-          setMessages(prev => {
-            const newMsgs = [...prev];
-            if (newMsgs[botMessageIndex]) {
-              newMsgs[botMessageIndex] = {
-                ...newMsgs[botMessageIndex],
-                content: fullText,
-                sources: collectedSources
-              };
-            }
-            return newMsgs;
-          });
         }
 
-        // If only sources were updated (and no text), trigger an update here
+        // Single consolidated state update for text and/or sources
         if (shouldUpdate) {
           setMessages(prev => {
             const newMsgs = [...prev];
@@ -198,7 +195,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
       <div className="flex-grow p-1 overflow-y-auto space-y-2">
         {messages.map((msg, index) => (
           <Message
-            key={index}
+            key={msg.id}
             role={msg.role}
             content={msg.content}
             sources={msg.sources}

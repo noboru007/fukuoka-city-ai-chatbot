@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { generateSong, querySong } from '../services/murekaService';
-import { convertLyricsToReading, generateSongLyrics } from '../services/geminiService';
+import { convertLyricsToReading, generateSongLyrics } from '../services/musicService';
 import { CloseIcon, LoadingSpinnerIcon, PlayIcon, StopIcon, MusicIcon } from './Icons'; // Assuming I add MusicIcon later
-
+import { translations } from '../utils/translations';
+import type { MusicComposerTranslation } from '../utils/translations';
 import type { Language } from '../types';
 
 interface MusicComposerProps {
@@ -12,56 +13,8 @@ interface MusicComposerProps {
     language: Language;
 }
 
-const uiTranslations = {
-    ja: {
-        headerTitle: 'AIソング作曲',
-        songTitle: '曲のタイトル',
-        songTitlePlaceholder: 'タイトルを入力',
-        lyrics: '歌詞',
-        lyricsPlaceholder: '歌詞を生成中...',
-        style: 'スタイル',
-        stylePlaceholder: '例: J-Pop, ロック, バラード',
-        vocal: 'ボーカル',
-        female: '女性',
-        male: '男性',
-        composeButton: '作曲する',
-        generatingLyrics: '歌詞を生成中...',
-        generatingTitle: '作曲中...',
-        generatingDesc: 'AIがメロディと歌声を生成しています。通常1分ほどかかります。',
-        download: '音声をダウンロード',
-        createAnother: '別の曲を作る',
-        poweredBy: 'Powered by Mureka API. 生成には1〜2分かかります。',
-        errorLyrics: '歌詞の生成に失敗しました',
-        errorComposition: '作曲の開始に失敗しました',
-        errorGenFailed: '生成に失敗しました',
-        convertKana: '漢字をかなに変換して作曲',
-        model: 'モデル'
-    },
-    en: {
-        headerTitle: 'AI Song Composer',
-        songTitle: 'Song Title',
-        songTitlePlaceholder: 'Song Title',
-        lyrics: 'Lyrics',
-        lyricsPlaceholder: 'Generating lyrics...',
-        style: 'Style',
-        stylePlaceholder: 'e.g. J-Pop, Rock, Ballad',
-        vocal: 'Vocal',
-        female: 'Female',
-        male: 'Male',
-        composeButton: 'Compose Song',
-        generatingLyrics: 'Generating Lyrics...',
-        generatingTitle: 'Composing your song...',
-        generatingDesc: 'The AI is producing the melody and vocals. This usually takes about a minute.',
-        download: 'Download Audio',
-        createAnother: 'Create Another Version',
-        poweredBy: 'Powered by Mureka API. Generation takes 1-2 minutes.',
-        errorLyrics: 'Failed to generate lyrics',
-        errorComposition: 'Failed to start song generation',
-        errorGenFailed: 'Generation failed',
-        convertKana: 'Convert Kanji to Kana for singing',
-        model: 'Model'
-    }
-};
+// Default English translations as fallback
+const defaultMusicTranslation: MusicComposerTranslation = translations.en.musicComposer!;
 
 const MusicComposer: React.FC<MusicComposerProps> = ({ isOpen, onClose, initialPrompt, language }) => {
     const [step, setStep] = useState<'lyrics' | 'generating' | 'completed'>('lyrics');
@@ -79,7 +32,7 @@ const MusicComposer: React.FC<MusicComposerProps> = ({ isOpen, onClose, initialP
     const [convertKana, setConvertKana] = useState(true);
     const [model, setModel] = useState('mureka-o2');
 
-    const t = language === 'ja' ? uiTranslations.ja : uiTranslations.en;
+    const t = translations[language]?.musicComposer || defaultMusicTranslation;
 
     // Auto-generate lyrics on open
     useEffect(() => {

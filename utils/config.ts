@@ -8,8 +8,8 @@ interface Config {
   FISH_GRANDMA_VOICE_ID: string | null;
   FISH_AGENT_VOICE_ID_EN: string | null;
   FISH_GRANDMA_VOICE_ID_EN: string | null;
-  FISH_AGENT_VOICE_ID_KR: string | null;
-  FISH_GRANDMA_VOICE_ID_KR: string | null;
+  FISH_AGENT_VOICE_ID_KO: string | null;
+  FISH_GRANDMA_VOICE_ID_KO: string | null;
   FISH_AGENT_VOICE_ID_ZH: string | null;
   FISH_GRANDMA_VOICE_ID_ZH: string | null;
   FISH_AGENT_VOICE_ID_ES: string | null;

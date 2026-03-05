@@ -10,6 +10,7 @@ export interface AudioSegment {
 }
 
 export interface Message {
+  id: string;
   role: 'user' | 'model';
   content: string;
   sources?: Source[];
@@ -22,7 +23,7 @@ export type FontSize = 'sm' | 'md' | 'lg';
 
 export type ResponseLength = 'short' | 'long';
 
-export type Model = 'gemini-3-flash-preview' | 'gemini-3-pro-preview' | 'gemini-2.5-pro';
+export type Model = 'gemini-3-flash-preview' | 'gemini-3.1-pro-preview' | 'gemini-3-pro';
 
 export type Language =
   | 'ja' // Japanese
