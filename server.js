@@ -10,7 +10,7 @@ dotenv.config({ path: '.env.local' });
 // --- SECURITY FIX: Add Referer header to all Google API requests ---
 // This allows us to use "Website restrictions" in Google Cloud Console
 // even for server-side requests.
-const CLOUD_RUN_URL = 'https://fukuoka-city-ai-chatbot-v2-411258323672.us-west1.run.app';
+const CLOUD_RUN_URL = 'https://fukuoka-city-ai-chatbot-v2-bmvmvbvteq-uw.a.run.app';
 const originalFetch = global.fetch;
 
 global.fetch = async (url, options = {}) => {
@@ -60,7 +60,15 @@ app.use('/api', murekaRoutes);
 app.use('/api', proxyRoutes);
 
 // ビルドされた静的ファイル（distフォルダ）を配信
-app.use(express.static(path.join(__dirname, 'dist')));
+app.use(express.static(path.join(__dirname, 'dist'), {
+  setHeaders: (res, path) => {
+    if (path.endsWith('sw.js') || path.endsWith('manifest.webmanifest')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
 
 // SPA対応: どのパスへのアクセスも index.html を返す
 app.get('*', (req, res) => {

@@ -16,7 +16,8 @@ interface MusicComposerTranslation {
   generatingLyrics: string;
   generatingTitle: string;
   generatingDesc: string;
-  download: string;
+  downloadMp3: string;
+  downloadLyrics: string;
   createAnother: string;
   poweredBy: string;
   errorLyrics: string;
@@ -81,7 +82,8 @@ export const translations: Record<Language, Translation> = {
       generatingLyrics: '歌詞を生成中...',
       generatingTitle: '作曲中...',
       generatingDesc: 'AIがメロディと歌声を生成しています。通常1分ほどかかります。',
-      download: '音声をダウンロード',
+      downloadMp3: '🎵 MP3をダウンロード',
+      downloadLyrics: '📝 歌詞をダウンロード',
       createAnother: '別の曲を作る',
       poweredBy: 'Powered by Mureka API. 生成には1〜2分かかります。',
       errorLyrics: '歌詞の生成に失敗しました',
@@ -123,7 +125,8 @@ export const translations: Record<Language, Translation> = {
       generatingLyrics: 'Generating Lyrics...',
       generatingTitle: 'Composing your song...',
       generatingDesc: 'The AI is producing the melody and vocals. This usually takes about a minute.',
-      download: 'Download Audio',
+      downloadMp3: '🎵 Download MP3',
+      downloadLyrics: '📝 Download Lyrics',
       createAnother: 'Create Another Version',
       poweredBy: 'Powered by Mureka API. Generation takes 1-2 minutes.',
       errorLyrics: 'Failed to generate lyrics',

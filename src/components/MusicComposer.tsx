@@ -160,27 +160,18 @@ const MusicComposer: React.FC<MusicComposerProps> = ({ isOpen, onClose, initialP
         }
     };
 
-    const handleDownload = async () => {
-        if (!songUrl) return;
-
-        // Format: YYYYMMDD-HHmmss
+    const getFileNameBase = () => {
         const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const seconds = String(now.getSeconds()).padStart(2, '0');
-        const timestamp = `${year}${month}${day}-${hours}${minutes}${seconds}`;
-
-        // Sanitize title (simple replacement)
-        // Ensure to keep Japanese characters
+        const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
         const safeTitle = (title || 'song').trim().replace(/[\\/:*?"<>|]/g, '_');
-        const fileNameBase = `${safeTitle}_${timestamp}`;
+        return `${safeTitle}_${timestamp}`;
+    };
 
-        // Download Audio - Use Proxy + Blob for Safari/iOS compatibility
+    const handleDownloadMp3 = async () => {
+        if (!songUrl) return;
+        const fileNameBase = getFileNameBase();
+        const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(songUrl)}&filename=${encodeURIComponent(fileNameBase + '.mp3')}`;
         try {
-            const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(songUrl)}&filename=${encodeURIComponent(fileNameBase + '.mp3')}`;
             const res = await fetch(proxyUrl);
             const blob = await res.blob();
             const url = window.URL.createObjectURL(blob);
@@ -194,20 +185,20 @@ const MusicComposer: React.FC<MusicComposerProps> = ({ isOpen, onClose, initialP
         } catch (e) {
             console.error('Failed to download MP3:', e);
         }
+    };
 
-        // Download Lyrics - Add BOM for Windows/Android compatibility
-        if (lyrics) {
-            // Add Byte Order Mark (BOM) for UTF-8 identification
-            const blob = new Blob(['\uFEFF', lyrics], { type: 'text/plain;charset=utf-8' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${fileNameBase}.txt`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        }
+    const handleDownloadLyrics = () => {
+        if (!lyrics) return;
+        const fileNameBase = getFileNameBase();
+        const blob = new Blob(['\uFEFF', lyrics], { type: 'text/plain;charset=utf-8' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${fileNameBase}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
     };
 
     if (!isOpen) return null;
@@ -369,12 +360,22 @@ const MusicComposer: React.FC<MusicComposerProps> = ({ isOpen, onClose, initialP
                             </div>
 
                             {songUrl && (
-                                <button
-                                    onClick={handleDownload}
-                                    className="text-gray-400 hover:text-white text-sm underline mt-4 block"
-                                >
-                                    {t.download}
-                                </button>
+                                <div className="flex gap-4 mt-4 justify-center">
+                                    <button
+                                        onClick={handleDownloadMp3}
+                                        className="text-gray-400 hover:text-white text-sm underline"
+                                    >
+                                        {t.downloadMp3}
+                                    </button>
+                                    {lyrics && (
+                                        <button
+                                            onClick={handleDownloadLyrics}
+                                            className="text-gray-400 hover:text-white text-sm underline"
+                                        >
+                                            {t.downloadLyrics}
+                                        </button>
+                                    )}
+                                </div>
                             )}
 
                             {/* Display Lyrics during playback */}
