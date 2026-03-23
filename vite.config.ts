@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import net from 'net';
@@ -40,16 +41,81 @@ function findFreePort(startPort: number, maxAttempts = 20): Promise<number> {
 }
 
 // https://vitejs.dev/config/
-export default defineConfig(async () => {
-  const port = await findFreePort(5173);
-  if (port !== 5173) {
-    console.log(`[Vite] Port 5173 in use, using port ${port} instead`);
+export default defineConfig(async ({ command }) => {
+  let port = 5173;
+  if (command === 'serve') {
+    try {
+      port = await findFreePort(5173);
+      if (port !== 5173) {
+        console.log(`[Vite] Port 5173 in use, using port ${port} instead`);
+      }
+    } catch (e) {
+      console.warn('[Vite] Failed to find free port, falling back to 5173');
+    }
   }
-  console.log('[Vite Build] Using runtime config (no build-time API keys)');
+  console.log(`[Vite Build] Mode: ${command} (no build-time API keys)`);
 
   return {
     plugins: [
       react(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        includeAssets: ['pwa-192x192.png', 'pwa-512x512.png'],
+        manifest: {
+          name: 'Fukuoka City AI Chatbot',
+          short_name: '福岡AIチャット',
+          description: 'Fukuoka City AI Chatbot - 福岡の街についてAIと楽しくおしゃべりしよう！',
+          theme_color: '#2563eb',
+          background_color: '#1f2937',
+          display: 'standalone',
+          start_url: '/',
+          icons: [
+            {
+              src: 'pwa-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+            },
+            {
+              src: 'pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+            },
+            {
+              src: 'pwa-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable',
+            },
+          ],
+        },
+        workbox: {
+          navigateFallback: '/index.html',
+          runtimeCaching: [
+            {
+              urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'google-fonts-cache',
+                expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+            {
+              urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+              handler: 'CacheFirst',
+              options: {
+                cacheName: 'gstatic-fonts-cache',
+                expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+            {
+              urlPattern: /\/api\/.*/i,
+              handler: 'NetworkOnly',
+            },
+          ],
+        },
+      }),
     ],
     resolve: {
       alias: {

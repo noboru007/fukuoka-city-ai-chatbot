@@ -39,11 +39,13 @@ RUN npm ci --omit=dev
 # Copy built files from builder stage
 COPY --from=builder /app/dist ./dist
 COPY server.js ./
+COPY server/ ./server/
 
 # Verify dist folder exists
-RUN echo "=== Verifying dist folder in production stage ===" && \
+RUN echo "=== Verifying dist and server folders in production stage ===" && \
     ls -la && \
-    ls -la dist/
+    ls -la dist/ && \
+    ls -la server/
 
 # Expose port
 ENV PORT=8080

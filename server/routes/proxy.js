@@ -1,4 +1,5 @@
 import express from 'express';
+import { Readable } from 'stream';
 
 const router = express.Router();
 
@@ -16,18 +17,30 @@ router.get('/proxy-download', async (req, res) => {
             return res.status(fetchResponse.status).send('Failed to fetch file');
         }
 
-        // Use filename*=UTF-8'' syntax for non-ASCII characters
-        const safeFilename = filename ? encodeURIComponent(filename) : 'download';
-        res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"; filename*=UTF-8''${safeFilename}`);
-        res.setHeader('Content-Type', fetchResponse.headers.get('content-type') || 'application/octet-stream');
+        // ヘッダーを即座に送信（ブラウザがダウンロードであることを即座に認識できる）
+        const rawFilename = filename || 'download.mp3';
+        const asciiFilename = rawFilename.replace(/[^\w.\-]/g, '_');
+        const utf8Filename = encodeURIComponent(rawFilename);
+        res.setHeader('Content-Disposition', `attachment; filename="${asciiFilename}"; filename*=UTF-8''${utf8Filename}`);
 
-        const blob = await fetchResponse.blob();
-        const buffer = Buffer.from(await blob.arrayBuffer());
-        res.send(buffer);
+        const contentType = fetchResponse.headers.get('content-type');
+        res.setHeader('Content-Type', contentType && contentType.includes('audio') ? contentType : 'audio/mpeg');
+
+        // Content-Lengthがあれば転送（ブラウザがファイルサイズを認識できる）
+        const contentLength = fetchResponse.headers.get('content-length');
+        if (contentLength) {
+            res.setHeader('Content-Length', contentLength);
+        }
+
+        // バッファリングせずストリーミングで返す
+        const nodeStream = Readable.fromWeb(fetchResponse.body);
+        nodeStream.pipe(res);
 
     } catch (error) {
         console.error('Proxy download error:', error);
-        res.status(500).send('Internal server error');
+        if (!res.headersSent) {
+            res.status(500).send('Internal server error');
+        }
     }
 });
 

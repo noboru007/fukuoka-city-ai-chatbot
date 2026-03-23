@@ -178,24 +178,21 @@ const MusicComposer: React.FC<MusicComposerProps> = ({ isOpen, onClose, initialP
         const safeTitle = (title || 'song').trim().replace(/[\\/:*?"<>|]/g, '_');
         const fileNameBase = `${safeTitle}_${timestamp}`;
 
-        // Download Audio - Use Proxy to force filename
+        // Download Audio - Use Proxy + Blob for Safari/iOS compatibility
         try {
             const proxyUrl = `/api/proxy-download?url=${encodeURIComponent(songUrl)}&filename=${encodeURIComponent(fileNameBase + '.mp3')}`;
-            // Trigger download via proxy
+            const res = await fetch(proxyUrl);
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = proxyUrl;
-            a.download = `${fileNameBase}.mp3`; // Fallback hint
+            a.href = url;
+            a.download = `${fileNameBase}.mp3`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
         } catch (e) {
-            console.error('Failed to download audio via proxy', e);
-            // Fallback to direct link
-            const a = document.createElement('a');
-            a.href = songUrl;
-            a.target = '_blank';
-            a.download = `${fileNameBase}.mp3`;
-            a.click();
+            console.error('Failed to download MP3:', e);
         }
 
         // Download Lyrics - Add BOM for Windows/Android compatibility
