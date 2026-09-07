@@ -10,6 +10,7 @@ const App: React.FC = () => {
   const [responseLength, setResponseLength] = useState<ResponseLength>('short');
   const [language, setLanguage] = useState<Language>('ja');
   const [model, setModel] = useState<Model>('gemini-3.8-flash');
+  const [autoPlayAudio, setAutoPlayAudio] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -191,6 +192,23 @@ const App: React.FC = () => {
               </div>
               <div className="px-4 py-2 border-b border-gray-700">
                 <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-semibold">
+                  {t.menu.audioPlayback || 'Audio Playback'}
+                </label>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={autoPlayAudio}
+                  onClick={() => setAutoPlayAudio(enabled => !enabled)}
+                  className={`w-full flex items-center justify-between text-sm px-2 py-1 rounded transition-colors ${autoPlayAudio ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                >
+                  <span>{autoPlayAudio ? (t.menu.on || 'On') : (t.menu.off || 'Off')}</span>
+                  <span className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${autoPlayAudio ? 'bg-blue-300' : 'bg-gray-600'}`}>
+                    <span className={`inline-block h-4 w-4 mt-0.5 rounded-full bg-white transition-transform ${autoPlayAudio ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+                  </span>
+                </button>
+              </div>
+              <div className="px-4 py-2 border-b border-gray-700">
+                <label className="block text-xs text-gray-500 mb-1 uppercase tracking-wide font-semibold">
                   LLM Model
                 </label>
                 <div className="flex flex-col gap-1">
@@ -224,7 +242,12 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-grow overflow-hidden flex flex-col relative">
-        <ChatWindow responseLength={responseLength} language={language} model={model} />
+        <ChatWindow
+          responseLength={responseLength}
+          language={language}
+          model={model}
+          autoPlayAudio={autoPlayAudio}
+        />
       </main>
     </div>
   );

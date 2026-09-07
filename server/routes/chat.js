@@ -49,6 +49,21 @@ function getGenerationConfig(model) {
     return { temperature: 0.4 };
 }
 
+async function createChat(apiKey, responseLength, language, model, history = []) {
+    const { GoogleGenAI } = await import('@google/genai');
+    const genAI = new GoogleGenAI({ apiKey });
+
+    return genAI.chats.create({
+        model,
+        config: {
+            systemInstruction: getSystemInstruction(responseLength, language),
+            tools: [{ googleSearch: {} }],
+            ...getGenerationConfig(model)
+        },
+        ...(history.length > 0 ? { history } : {}),
+    });
+}
+
 function getSystemInstruction(responseLength, language) {
     const lengthInstruction = responseLength === 'short'
         ? '- **Conciseness**: Keep answers concise and to the point, within 3 lines.'
@@ -167,25 +182,14 @@ router.post('/chat/init', async (req, res) => {
             return res.status(400).json({ error: 'Missing required fields: responseLength, language, model' });
         }
 
-        const { GoogleGenAI } = await import('@google/genai');
-        const genAI = new GoogleGenAI({ apiKey });
-
-        const systemInstruction = getSystemInstruction(responseLength, language);
-        const generationConfig = getGenerationConfig(model);
-
-        const chat = genAI.chats.create({
-            model,
-            config: {
-                systemInstruction,
-                tools: [{ googleSearch: {} }],
-                ...generationConfig
-            },
-        });
+        const chat = await createChat(apiKey, responseLength, language, model);
 
         const sessionId = randomUUID();
         chatSessions.set(sessionId, {
             chat,
             language,
+            responseLength,
+            model,
             createdAt: Date.now(),
         });
 
@@ -202,7 +206,7 @@ router.post('/chat/init', async (req, res) => {
 router.post('/chat/send', async (req, res) => {
     try {
         const apiKey = process.env.API_KEY;
-        const { sessionId, message } = req.body;
+        const { sessionId, message, responseLength, language, model } = req.body;
 
         if (!sessionId || !message) {
             return res.status(400).json({ error: 'Missing sessionId or message' });
@@ -215,6 +219,24 @@ router.post('/chat/send', async (req, res) => {
 
         // Touch session to prevent cleanup
         session.createdAt = Date.now();
+
+        // A chat's model and default config cannot be changed in place. Recreate
+        // it with the SDK-managed history when a menu setting has changed.
+        const nextResponseLength = responseLength || session.responseLength;
+        const nextLanguage = language || session.language;
+        const nextModel = model || session.model;
+        const settingsChanged = nextResponseLength !== session.responseLength
+            || nextLanguage !== session.language
+            || nextModel !== session.model;
+
+        if (settingsChanged) {
+            const history = session.chat.getHistory(true);
+            session.chat = await createChat(apiKey, nextResponseLength, nextLanguage, nextModel, history);
+            session.responseLength = nextResponseLength;
+            session.language = nextLanguage;
+            session.model = nextModel;
+            console.log(`[Chat] Session reconfigured: ${sessionId} (model: ${nextModel}, lang: ${nextLanguage}, length: ${nextResponseLength}, history: ${history.length})`);
+        }
 
         // YouTube context enhancement (server-side)
         const youtubeKeywords = ['動画', 'YouTube', '最新', '最近', '新着', 'イベント', '情報', '投稿', '配信', 'video', 'latest', 'recent', 'event'];

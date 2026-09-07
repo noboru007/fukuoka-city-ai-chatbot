@@ -16,9 +16,10 @@ interface MessageProps {
   onGenerateAudio: () => void;
   onComposeMusic?: () => void;
   language: Language;
+  autoPlayAudio: boolean;
 }
 
-const Message: React.FC<MessageProps> = ({ role, content, sources, audioSegments, isGeneratingAudio, onGenerateAudio, onComposeMusic, language }) => {
+const Message: React.FC<MessageProps> = ({ role, content, sources, audioSegments, isGeneratingAudio, onGenerateAudio, onComposeMusic, language, autoPlayAudio }) => {
   const isUser = role === 'user';
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -72,6 +73,12 @@ const Message: React.FC<MessageProps> = ({ role, content, sources, audioSegments
     currentSegmentIndexRef.current = 0;
     setIsPlaying(false);
   };
+
+  useEffect(() => {
+    if (!autoPlayAudio) {
+      stopPlayback();
+    }
+  }, [autoPlayAudio]);
 
   const playNextSegment = () => {
     if (!audioSegments || currentSegmentIndexRef.current >= audioSegments.length) {

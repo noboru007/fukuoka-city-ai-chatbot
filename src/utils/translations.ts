@@ -43,6 +43,9 @@ interface Translation {
     lg: string;
     short: string;
     long: string;
+    audioPlayback?: string;
+    on?: string;
+    off?: string;
   };
   musicComposer?: MusicComposerTranslation;
 }
@@ -66,6 +69,9 @@ export const translations: Record<Language, Translation> = {
       lg: '大',
       short: '短め',
       long: '長め',
+      audioPlayback: '音声再生',
+      on: 'オン',
+      off: 'オフ',
     },
     musicComposer: {
       headerTitle: 'AIソング作曲',
@@ -109,6 +115,9 @@ export const translations: Record<Language, Translation> = {
       lg: 'Large',
       short: 'Short',
       long: 'Long',
+      audioPlayback: 'Audio Playback',
+      on: 'On',
+      off: 'Off',
     },
     musicComposer: {
       headerTitle: 'AI Song Composer',

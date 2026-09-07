@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { initChat, streamChat, SPEAKER_NAMES } from '../services/geminiService';
+import { initChat, streamChat } from '../services/geminiService';
 import { generateMultiSpeakerAudio } from '../services/ttsService';
 import type { Message as MessageType, ResponseLength, Language, Source, Model } from '../types';
 import Message from './Message';
@@ -14,17 +14,18 @@ interface ChatWindowProps {
   responseLength: ResponseLength;
   language: Language;
   model: Model;
+  autoPlayAudio: boolean;
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model, autoPlayAudio }) => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isMusicComposerOpen, setIsMusicComposerOpen] = useState(false);
   const [composerPrompt, setComposerPrompt] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const currentStreamingAudioIndex = useRef<number | null>(null);
+  const messagesRef = useRef<MessageType[]>([]);
+  const autoPlayAudioRef = useRef(autoPlayAudio);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -32,7 +33,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
 
   useEffect(() => {
     scrollToBottom();
+    messagesRef.current = messages;
   }, [messages]);
+
+  useEffect(() => {
+    autoPlayAudioRef.current = autoPlayAudio;
+  }, [autoPlayAudio]);
 
   useEffect(() => {
     const setupChat = async () => {
@@ -60,63 +66,47 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
     };
 
     setupChat();
-  }, [responseLength, language, model]);
+  }, []);
+
+  const updateMessage = (messageId: string, updates: Partial<MessageType>) => {
+    setMessages(prev => prev.map(message => (
+      message.id === messageId ? { ...message, ...updates } : message
+    )));
+  };
 
   const handleSendMessage = async (userInput: string) => {
     if (!sessionId || userInput.trim() === '') return;
 
     const userMessage: MessageType = { id: generateMessageId(), role: 'user', content: userInput };
-    setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
 
-    const botMessageIndex = messages.length + 1;
-    setMessages(prev => [...prev, {
-      id: generateMessageId(),
+    const botMessageId = generateMessageId();
+    const botMessage: MessageType = {
+      id: botMessageId,
       role: 'model',
       content: '',
       sources: [],
       isGeneratingAudio: false,
       audioContent: null,
-    }]);
-
-    currentStreamingAudioIndex.current = botMessageIndex;
+    };
+    setMessages(prev => [...prev, userMessage, botMessage]);
 
     let fullText = '';
     let collectedSources: Source[] = [];
 
     try {
-      const stream = streamChat(sessionId, userInput);
+      const stream = streamChat(sessionId, userInput, responseLength, language, model);
 
       for await (const chunk of stream) {
         if (chunk.type === 'text' && chunk.text) {
           fullText += chunk.text;
-          setMessages(prev => {
-            const newMsgs = [...prev];
-            if (newMsgs[botMessageIndex]) {
-              newMsgs[botMessageIndex] = {
-                ...newMsgs[botMessageIndex],
-                content: fullText,
-                sources: collectedSources,
-              };
-            }
-            return newMsgs;
-          });
+          updateMessage(botMessageId, { content: fullText, sources: collectedSources });
         }
 
         if (chunk.type === 'sources' && chunk.sources) {
           collectedSources = [...collectedSources, ...chunk.sources];
           collectedSources = Array.from(new Map(collectedSources.map(item => [item.uri, item])).values());
-          setMessages(prev => {
-            const newMsgs = [...prev];
-            if (newMsgs[botMessageIndex]) {
-              newMsgs[botMessageIndex] = {
-                ...newMsgs[botMessageIndex],
-                content: fullText,
-                sources: collectedSources,
-              };
-            }
-            return newMsgs;
-          });
+          updateMessage(botMessageId, { content: fullText, sources: collectedSources });
         }
 
         if (chunk.type === 'done') {
@@ -126,52 +116,46 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
 
     } catch (error) {
       console.error("Streaming error:", error);
-      setMessages(prev => {
-        const newMsgs = [...prev];
-        if (newMsgs[botMessageIndex]) {
-          newMsgs[botMessageIndex] = {
-            ...newMsgs[botMessageIndex],
-            content: fullText || "An error occurred. Please try again.",
-          };
-        }
-        return newMsgs;
-      });
+      fullText = fullText || "An error occurred. Please try again.";
+      updateMessage(botMessageId, { content: fullText });
     } finally {
       setIsLoading(false);
     }
-  };
 
-  const handleGenerateAudio = async (messageIndex: number) => {
-    const message = messages[messageIndex];
-    if (!message || message.role !== 'model' || !message.content) return;
-
-    setMessages(prev => {
-      const newMsgs = [...prev];
-      newMsgs[messageIndex] = { ...newMsgs[messageIndex], isGeneratingAudio: true };
-      return newMsgs;
-    });
-
-    try {
-      const audioSegments = await generateMultiSpeakerAudio(message.content, language);
-
-      setMessages(prev => {
-        const newMsgs = [...prev];
-        newMsgs[messageIndex] = {
-          ...newMsgs[messageIndex],
-          audioSegments: audioSegments,
-          isGeneratingAudio: false
-        };
-        return newMsgs;
-      });
-    } catch (error) {
-      console.error('Audio generation failed:', error);
-      setMessages(prev => {
-        const newMsgs = [...prev];
-        newMsgs[messageIndex] = { ...newMsgs[messageIndex], isGeneratingAudio: false };
-        return newMsgs;
-      });
+    if (autoPlayAudioRef.current && fullText) {
+      void handleGenerateAudio(botMessageId, fullText, language);
     }
   };
+
+  const handleGenerateAudio = async (messageId: string, contentOverride?: string, languageOverride?: Language) => {
+    const message = messagesRef.current.find(item => item.id === messageId);
+    const content = contentOverride || message?.content;
+    if ((!message && !contentOverride) || message?.role === 'user' || !content) return;
+
+    updateMessage(messageId, { isGeneratingAudio: true });
+
+    try {
+      const audioSegments = await generateMultiSpeakerAudio(content, languageOverride || language);
+      updateMessage(messageId, { audioSegments, isGeneratingAudio: false });
+    } catch (error) {
+      console.error('Audio generation failed:', error);
+      updateMessage(messageId, { isGeneratingAudio: false });
+    }
+  };
+
+  const previousAutoPlayAudioRef = useRef(false);
+  useEffect(() => {
+    if (autoPlayAudio && !previousAutoPlayAudioRef.current) {
+      const latestModelMessage = [...messagesRef.current]
+        .reverse()
+        .find(message => message.role === 'model' && message.content.trim());
+
+      if (latestModelMessage && !latestModelMessage.isGeneratingAudio && !latestModelMessage.audioSegments?.length) {
+        void handleGenerateAudio(latestModelMessage.id);
+      }
+    }
+    previousAutoPlayAudioRef.current = autoPlayAudio;
+  }, [autoPlayAudio]);
 
   const handleComposeMusic = (content: string) => {
     setComposerPrompt(content);
@@ -181,7 +165,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
   return (
     <>
       <div className="flex-grow p-1 overflow-y-auto space-y-2">
-        {messages.map((msg, index) => (
+        {messages.map((msg) => (
           <Message
             key={msg.id}
             role={msg.role}
@@ -189,9 +173,10 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
             sources={msg.sources}
             audioSegments={msg.audioSegments}
             isGeneratingAudio={msg.isGeneratingAudio}
-            onGenerateAudio={() => handleGenerateAudio(index)}
+            onGenerateAudio={() => handleGenerateAudio(msg.id)}
             onComposeMusic={() => handleComposeMusic(msg.content)}
             language={language}
+            autoPlayAudio={autoPlayAudio}
           />
         ))}
         {isLoading && messages.length > 0 && messages[messages.length - 1]?.role === 'user' && (

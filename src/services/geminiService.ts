@@ -54,11 +54,17 @@ interface SSEChunk {
 }
 
 // Stream chat response via SSE
-export async function* streamChat(sessionId: string, message: string): AsyncGenerator<SSEChunk> {
+export async function* streamChat(
+    sessionId: string,
+    message: string,
+    responseLength: ResponseLength,
+    language: Language,
+    model: Model,
+): AsyncGenerator<SSEChunk> {
     const response = await fetch('/api/chat/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, message }),
+        body: JSON.stringify({ sessionId, message, responseLength, language, model }),
     });
 
     if (!response.ok) {

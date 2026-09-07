@@ -1,6 +1,7 @@
 import express from 'express';
 
 const router = express.Router();
+const FISH_TTS_MODEL = process.env.FISH_TTS_MODEL || 's2.1-pro-free';
 
 // Fish Audio TTS Proxy API
 router.post('/fish-tts', async (req, res) => {
@@ -21,6 +22,8 @@ router.post('/fish-tts', async (req, res) => {
             headers: {
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json',
+                // Fish Audio S2.1 is selected with the model request header.
+                'model': FISH_TTS_MODEL,
             },
             body: JSON.stringify({
                 text,
@@ -28,7 +31,7 @@ router.post('/fish-tts', async (req, res) => {
                 format: 'mp3',
                 mp3_bitrate: 128,
                 normalize: true,
-                latency: 'balanced',
+                latency: 'normal',
             }),
         });
 
