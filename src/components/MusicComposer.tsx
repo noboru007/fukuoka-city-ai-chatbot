@@ -300,7 +300,7 @@ const MusicComposer: React.FC<MusicComposerProps> = ({ isOpen, onClose, initialP
                                     className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white text-sm"
                                 >
                                     <option value="mureka-o2">Mureka O2 (Fast & Balanced)</option>
-                                    <option value="mureka-8">Mureka 8 (High Quality)</option>
+                                    <option value="mureka-9.5">Mureka 9.5 (High Quality)</option>
                                 </select>
                             </div>
 
