@@ -9,7 +9,7 @@ const App: React.FC = () => {
   const [fontSize, setFontSize] = useState<FontSize>('md');
   const [responseLength, setResponseLength] = useState<ResponseLength>('short');
   const [language, setLanguage] = useState<Language>('ja');
-  const [model, setModel] = useState<Model>('gemini-3-flash-preview');
+  const [model, setModel] = useState<Model>('gemini-3.8-flash');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -195,22 +195,22 @@ const App: React.FC = () => {
                 </label>
                 <div className="flex flex-col gap-1">
                   <button
+                    onClick={() => setModel('gemini-3.8-flash')}
+                    className={`text-left text-sm px-2 py-1 rounded ${model === 'gemini-3.8-flash' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                  >
+                    Gemini 3.8 Flash
+                  </button>
+                  <button
+                    onClick={() => setModel('gemini-3.7-flash')}
+                    className={`text-left text-sm px-2 py-1 rounded ${model === 'gemini-3.7-flash' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                  >
+                    Gemini 3.7 Flash
+                  </button>
+                  <button
                     onClick={() => setModel('gemini-3.1-pro-preview')}
                     className={`text-left text-sm px-2 py-1 rounded ${model === 'gemini-3.1-pro-preview' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
                   >
                     Gemini 3.1 Pro
-                  </button>
-                  <button
-                    onClick={() => setModel('gemini-3-flash-preview')}
-                    className={`text-left text-sm px-2 py-1 rounded ${model === 'gemini-3-flash-preview' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
-                  >
-                    Gemini 3 Flash
-                  </button>
-                  <button
-                    onClick={() => setModel('gemini-3-pro')}
-                    className={`text-left text-sm px-2 py-1 rounded ${model === 'gemini-3-pro' ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
-                  >
-                    Gemini 2.5 Pro
                   </button>
                 </div>
               </div>
