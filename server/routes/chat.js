@@ -110,9 +110,17 @@ function getSystemInstruction(responseLength, language) {
 # Response Length
 ${lengthInstruction}
 
-# Output Format (Always mark speaker names with ** bold markers)
-1. **${names.agent}**: (Answer)
-2. **${names.grandma}**: (Answer)
+# Output Format (Follow this exact format)
+**${names.agent}：**
+(Answer)
+
+**${names.grandma}：**
+(Answer)
+
+- Put each speaker label on its own line exactly as shown above.
+- Do not add a number, bullet, heading marker, or any other text before a speaker label.
+- Do not write any text before the first speaker label.
+- Never place one speaker's words inside the other speaker's section.
 
 `;
 }

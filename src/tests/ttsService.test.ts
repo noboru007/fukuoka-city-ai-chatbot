@@ -69,6 +69,41 @@ describe('splitIntoSpeakerSegments', () => {
         expect(segments[0].speaker).toBe('agent');
         expect(segments[1].speaker).toBe('grandma');
     });
+
+    it('handles numbered labels and different bold/colon positions', () => {
+        const text = `1. **市役所エージェント**: 福岡市の公式情報です。
+2. **フク婆さん：** 昔はこうだったったい。`;
+
+        const segments = splitIntoSpeakerSegments(text, 'ja');
+
+        expect(segments).toEqual([
+            { speaker: 'agent', text: '福岡市の公式情報です。' },
+            { speaker: 'grandma', text: '昔はこうだったったい。' },
+        ]);
+    });
+
+    it('handles bullets, headings, and speaker changes on the same line', () => {
+        const text = `- **市役所エージェント：** 公式情報です。
+### **フク婆さん**： 補足たい。 **市役所エージェント：** 最後の案内です。`;
+
+        const segments = splitIntoSpeakerSegments(text, 'ja');
+
+        expect(segments).toEqual([
+            { speaker: 'agent', text: '公式情報です。' },
+            { speaker: 'grandma', text: '補足たい。' },
+            { speaker: 'agent', text: '最後の案内です。' },
+        ]);
+    });
+
+    it('never includes speaker labels in spoken segments', () => {
+        const text = `**市役所エージェント：** 市役所の回答です。
+**フク婆さん：** 婆ちゃんの回答たい。`;
+
+        const segments = splitIntoSpeakerSegments(text, 'ja');
+
+        expect(segments.every(segment => !segment.text.includes('市役所エージェント'))).toBe(true);
+        expect(segments.every(segment => !segment.text.includes('フク婆さん'))).toBe(true);
+    });
 });
 
 describe('normalizeJapaneseTtsText', () => {

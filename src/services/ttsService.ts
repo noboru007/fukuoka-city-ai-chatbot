@@ -11,6 +11,13 @@ const isFishAudioSupported = (language: Language): boolean => {
     return FISH_AUDIO_SUPPORTED_LANGUAGES.includes(language);
 };
 
+const escapeRegex = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const createSpeakerMarkerPattern = (names: { agent: string; grandma: string }): string => {
+    const speakerNames = `${escapeRegex(names.agent)}|${escapeRegex(names.grandma)}`;
+    return `(?:\\*\\*)?(${speakerNames})(?:\\*\\*)?\\s*[:：](?:\\*\\*)?`;
+};
+
 const JAPANESE_DIGITS = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
 const JAPANESE_LARGE_UNITS = ['', '万', '億', '兆', '京'];
 
@@ -145,12 +152,12 @@ const generateFishAudioSegment = async (text: string, speakerRole: 'agent' | 'gr
         return null;
     }
 
-    const names = SPEAKER_NAMES[language];
+    const names = SPEAKER_NAMES[language] || SPEAKER_NAMES.en;
+    const speakerMarkerPattern = createSpeakerMarkerPattern(names);
 
     let cleanText = text
         .replace(/\*\*/g, '')
-        .replace(new RegExp(`^\\s*${names.agent}\\s*[：:]+\\s*`, 'i'), '')
-        .replace(new RegExp(`^\\s*${names.grandma}\\s*[：:]+\\s*`, 'i'), '')
+        .replace(new RegExp(speakerMarkerPattern, 'gi'), '')
         .replace(/[\u4E00-\u9FFF々〆〤]+[\(（]([\u3040-\u309F\u30A0-\u30FF\u30FC\s]+)[\)）]/g, '$1')
         .trim();
 
@@ -190,48 +197,37 @@ const generateFishAudioSegment = async (text: string, speakerRole: 'agent' | 'gr
 
 // Helper: Split text into speaker segments
 export const splitIntoSpeakerSegments = (text: string, language: Language): { text: string, speaker: 'agent' | 'grandma' | 'narrator' }[] => {
-    const names = SPEAKER_NAMES[language];
+    const names = SPEAKER_NAMES[language] || SPEAKER_NAMES.en;
     const segments: { text: string, speaker: 'agent' | 'grandma' | 'narrator' }[] = [];
 
-    const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    const agentPattern = `(?:\\*\\*)?${escapeRegex(names.agent)}(?:\\*\\*)?\\s*[:：]`;
-    const grandmaPattern = `(?:\\*\\*)?${escapeRegex(names.grandma)}(?:\\*\\*)?\\s*[:：]`;
-
-    const lines = text.split('\n');
+    const speakerMarkerPattern = createSpeakerMarkerPattern(names);
+    const leadingMarkdownPattern = new RegExp(
+        `^\\s*(?:(?:>\\s*)|(?:#{1,6}\\s+)|(?:(?:[-+*]|\\d+[.)])\\s+))*(?=${speakerMarkerPattern})`,
+        'i',
+    );
+    const normalizedText = text
+        .split('\n')
+        .map(line => line.replace(leadingMarkdownPattern, ''))
+        .join('\n');
+    const markerRegex = new RegExp(speakerMarkerPattern, 'gi');
     let currentSpeaker: 'agent' | 'grandma' | 'narrator' = 'narrator';
-    let accumulatedText = '';
+    let contentStart = 0;
 
-    for (const line of lines) {
-        const trimmedLine = line.trim();
-        if (!trimmedLine) continue;
-
-        const agentMatch = trimmedLine.match(new RegExp(`^${agentPattern}\\s*(.*)$`, 'i'));
-        const grandmaMatch = trimmedLine.match(new RegExp(`^${grandmaPattern}\\s*(.*)$`, 'i'));
-
-        if (agentMatch) {
-            if (accumulatedText.trim()) {
-                segments.push({ text: accumulatedText.trim(), speaker: currentSpeaker });
-                accumulatedText = '';
-            }
-            currentSpeaker = 'agent';
-            const restOfLine = agentMatch[1].trim();
-            if (restOfLine) accumulatedText += restOfLine + '\n';
-        } else if (grandmaMatch) {
-            if (accumulatedText.trim()) {
-                segments.push({ text: accumulatedText.trim(), speaker: currentSpeaker });
-                accumulatedText = '';
-            }
-            currentSpeaker = 'grandma';
-            const restOfLine = grandmaMatch[1].trim();
-            if (restOfLine) accumulatedText += restOfLine + '\n';
-        } else {
-            accumulatedText += trimmedLine + '\n';
+    for (const match of normalizedText.matchAll(markerRegex)) {
+        const markerStart = match.index;
+        const precedingText = normalizedText.slice(contentStart, markerStart).trim();
+        if (precedingText) {
+            segments.push({ text: precedingText, speaker: currentSpeaker });
         }
+
+        const matchedSpeakerName = match[1].toLocaleLowerCase();
+        currentSpeaker = matchedSpeakerName === names.agent.toLocaleLowerCase() ? 'agent' : 'grandma';
+        contentStart = markerStart + match[0].length;
     }
 
-    if (accumulatedText.trim()) {
-        segments.push({ text: accumulatedText.trim(), speaker: currentSpeaker });
+    const remainingText = normalizedText.slice(contentStart).trim();
+    if (remainingText) {
+        segments.push({ text: remainingText, speaker: currentSpeaker });
     }
 
     return segments;
