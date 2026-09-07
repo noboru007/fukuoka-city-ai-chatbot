@@ -77,6 +77,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
   const handleSendMessage = async (userInput: string) => {
     if (!sessionId || userInput.trim() === '') return;
 
+    const shouldAutoPlayResponse = autoPlayAudio;
     const userMessage: MessageType = { id: generateMessageId(), role: 'user', content: userInput };
     setIsLoading(true);
 
@@ -122,7 +123,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
       setIsLoading(false);
     }
 
-    if (autoPlayAudioRef.current && fullText) {
+    if (shouldAutoPlayResponse && autoPlayAudioRef.current && fullText) {
       void handleGenerateAudio(botMessageId, fullText, language);
     }
   };
@@ -142,20 +143,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ responseLength, language, model
       updateMessage(messageId, { isGeneratingAudio: false });
     }
   };
-
-  const previousAutoPlayAudioRef = useRef(false);
-  useEffect(() => {
-    if (autoPlayAudio && !previousAutoPlayAudioRef.current) {
-      const latestModelMessage = [...messagesRef.current]
-        .reverse()
-        .find(message => message.role === 'model' && message.content.trim());
-
-      if (latestModelMessage && !latestModelMessage.isGeneratingAudio && !latestModelMessage.audioSegments?.length) {
-        void handleGenerateAudio(latestModelMessage.id);
-      }
-    }
-    previousAutoPlayAudioRef.current = autoPlayAudio;
-  }, [autoPlayAudio]);
 
   const handleComposeMusic = (content: string) => {
     setComposerPrompt(content);
