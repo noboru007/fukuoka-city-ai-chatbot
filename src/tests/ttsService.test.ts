@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitIntoSpeakerSegments } from '../services/ttsService';
+import { normalizeJapaneseTtsText, splitIntoSpeakerSegments } from '../services/ttsService';
 
 describe('splitIntoSpeakerSegments', () => {
     it('splits Japanese text into agent and grandma segments', () => {
@@ -68,5 +68,23 @@ describe('splitIntoSpeakerSegments', () => {
         expect(segments).toHaveLength(2);
         expect(segments[0].speaker).toBe('agent');
         expect(segments[1].speaker).toBe('grandma');
+    });
+});
+
+describe('normalizeJapaneseTtsText', () => {
+    it('converts the school lunch example into natural Japanese readings', () => {
+        const text = '福岡市の小学校給食では通常の約2個分に相当する大きさ（約60g）で1個提供しました。';
+
+        expect(normalizeJapaneseTtsText(text)).toBe(
+            '福岡市の小学校給食では通常の約二個分に相当する大きさ（約六十グラム）で一個提供しました。',
+        );
+    });
+
+    it('supports decimals, comma-separated values, and full-width numbers', () => {
+        expect(normalizeJapaneseTtsText('１．５kgと1,200g')).toBe('一点五キログラムと千二百グラム');
+    });
+
+    it('does not change unrelated numbers', () => {
+        expect(normalizeJapaneseTtsText('令和8年度')).toBe('令和8年度');
     });
 });

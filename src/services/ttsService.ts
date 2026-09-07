@@ -11,6 +11,102 @@ const isFishAudioSupported = (language: Language): boolean => {
     return FISH_AUDIO_SUPPORTED_LANGUAGES.includes(language);
 };
 
+const JAPANESE_DIGITS = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+const JAPANESE_LARGE_UNITS = ['', '万', '億', '兆', '京'];
+
+const convertFourDigitGroupToJapanese = (value: number): string => {
+    const places = [
+        { divisor: 1000, unit: '千' },
+        { divisor: 100, unit: '百' },
+        { divisor: 10, unit: '十' },
+    ];
+    let remainder = value;
+    let result = '';
+
+    for (const { divisor, unit } of places) {
+        const digit = Math.floor(remainder / divisor);
+        if (digit > 0) {
+            result += digit === 1 ? unit : `${JAPANESE_DIGITS[digit]}${unit}`;
+            remainder %= divisor;
+        }
+    }
+
+    if (remainder > 0) result += JAPANESE_DIGITS[remainder];
+    return result;
+};
+
+const numberToJapanese = (rawNumber: string): string => {
+    const normalizedNumber = rawNumber.replace(/,/g, '');
+    const isNegative = normalizedNumber.startsWith('-');
+    const unsignedNumber = isNegative ? normalizedNumber.slice(1) : normalizedNumber;
+    const [integerPart, decimalPart] = unsignedNumber.split('.');
+
+    let integer = BigInt(integerPart || '0');
+    let integerReading = '';
+    let groupIndex = 0;
+
+    if (integer === 0n) {
+        integerReading = JAPANESE_DIGITS[0];
+    } else {
+        while (integer > 0n) {
+            const group = Number(integer % 10000n);
+            if (group > 0) {
+                const largeUnit = JAPANESE_LARGE_UNITS[groupIndex];
+                if (largeUnit === undefined) {
+                    return rawNumber;
+                }
+                integerReading = `${convertFourDigitGroupToJapanese(group)}${largeUnit}${integerReading}`;
+            }
+            integer /= 10000n;
+            groupIndex++;
+        }
+    }
+
+    const decimalReading = decimalPart
+        ? `点${decimalPart.split('').map(digit => JAPANESE_DIGITS[Number(digit)]).join('')}`
+        : '';
+
+    return `${isNegative ? 'マイナス' : ''}${integerReading}${decimalReading}`;
+};
+
+const normalizeFullWidthNumbers = (text: string): string => text
+    .replace(/[０-９]/g, character => String.fromCharCode(character.charCodeAt(0) - 0xFEE0))
+    .replace(/，/g, ',')
+    .replace(/．/g, '.');
+
+const JAPANESE_SPOKEN_UNITS: Record<string, string> = {
+    kcal: 'キロカロリー',
+    cal: 'カロリー',
+    kg: 'キログラム',
+    mg: 'ミリグラム',
+    g: 'グラム',
+    km: 'キロメートル',
+    cm: 'センチメートル',
+    mm: 'ミリメートル',
+    m: 'メートル',
+    kl: 'キロリットル',
+    ml: 'ミリリットル',
+    l: 'リットル',
+    '%': 'パーセント',
+    '％': 'パーセント',
+    '℃': '度',
+    '°c': '度',
+};
+
+export const normalizeJapaneseTtsText = (text: string): string => {
+    const normalizedText = normalizeFullWidthNumbers(text);
+
+    return normalizedText
+        .replace(
+            /(-?\d[\d,]*(?:\.\d+)?)\s*(kcal|cal|kg|mg|g|km|cm|mm|m|kl|ml|l|%|％|℃|°c)(?![a-z])/gi,
+            (_match, number: string, unit: string) => `${numberToJapanese(number)}${JAPANESE_SPOKEN_UNITS[unit.toLowerCase()]}`,
+        )
+        .replace(
+            /(-?\d[\d,]*(?:\.\d+)?)\s*個/g,
+            (_match, number: string) => `${numberToJapanese(number)}個`,
+        );
+};
+
 // Helper: Get Fish Audio Voice ID for specific language and speaker
 const getFishAudioVoiceId = async (speakerRole: 'agent' | 'grandma', language: Language): Promise<string | null> => {
     const config = await getConfig();
@@ -57,6 +153,10 @@ const generateFishAudioSegment = async (text: string, speakerRole: 'agent' | 'gr
         .replace(new RegExp(`^\\s*${names.grandma}\\s*[：:]+\\s*`, 'i'), '')
         .replace(/[\u4E00-\u9FFF々〆〤]+[\(（]([\u3040-\u309F\u30A0-\u30FF\u30FC\s]+)[\)）]/g, '$1')
         .trim();
+
+    if (language === 'ja') {
+        cleanText = normalizeJapaneseTtsText(cleanText);
+    }
 
     const agentEmotion = '';
     const grandmaEmotion = '';

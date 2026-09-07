@@ -7,6 +7,8 @@ import { AudioQueue } from '../utils/audioQueue';
 import { translations } from '../utils/translations';
 import { SPEAKER_NAMES } from '../services/geminiService';
 
+const AUDIO_PREROLL_MS = 500;
+
 interface MessageProps {
   role: 'user' | 'model';
   content: string;
@@ -26,6 +28,7 @@ const Message: React.FC<MessageProps> = ({ role, content, sources, audioSegments
   const audioQueueRef = useRef<AudioQueue | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const currentSegmentIndexRef = useRef<number>(0);
+  const prerollTimeoutRef = useRef<number | null>(null);
 
   const t = translations[language];
 
@@ -46,6 +49,10 @@ const Message: React.FC<MessageProps> = ({ role, content, sources, audioSegments
       });
     }
     return () => {
+      if (prerollTimeoutRef.current !== null) {
+        window.clearTimeout(prerollTimeoutRef.current);
+        prerollTimeoutRef.current = null;
+      }
       audioQueueRef.current?.stop();
       if (currentAudioRef.current) {
         currentAudioRef.current.pause();
@@ -65,6 +72,10 @@ const Message: React.FC<MessageProps> = ({ role, content, sources, audioSegments
   }, [isGeneratingAudio, audioSegments]);
 
   const stopPlayback = () => {
+    if (prerollTimeoutRef.current !== null) {
+      window.clearTimeout(prerollTimeoutRef.current);
+      prerollTimeoutRef.current = null;
+    }
     audioQueueRef.current?.stop();
     if (currentAudioRef.current) {
       currentAudioRef.current.pause();
@@ -88,15 +99,19 @@ const Message: React.FC<MessageProps> = ({ role, content, sources, audioSegments
       return;
     }
 
-    const segment = audioSegments[currentSegmentIndexRef.current];
+    const segmentIndex = currentSegmentIndexRef.current;
+    const segment = audioSegments[segmentIndex];
     currentSegmentIndexRef.current++;
 
     if (segment.format === 'mp3') {
       // Play MP3 using Audio element
       const audio = new Audio(`data:audio/mp3;base64,${segment.audio}`);
+      audio.preload = 'auto';
       currentAudioRef.current = audio;
+      let isPrerolling = segmentIndex === 0;
 
       audio.onended = () => {
+        if (isPrerolling) return;
         currentAudioRef.current = null;
         playNextSegment(); // Play next segment
       };
@@ -107,11 +122,34 @@ const Message: React.FC<MessageProps> = ({ role, content, sources, audioSegments
         playNextSegment(); // Try next segment
       };
 
-      audio.play().catch(err => {
+      const handlePlayError = (err: unknown) => {
         console.error('Failed to play MP3:', err);
         currentAudioRef.current = null;
         playNextSegment();
-      });
+      };
+
+      if (isPrerolling) {
+        // Warm up the browser/device audio path without consuming the beginning
+        // of the speech, then rewind and play it audibly from the first sample.
+        audio.muted = true;
+        audio.play()
+          .then(() => {
+            prerollTimeoutRef.current = window.setTimeout(() => {
+              prerollTimeoutRef.current = null;
+              if (currentAudioRef.current !== audio) return;
+
+              audio.pause();
+              audio.currentTime = 0;
+              audio.muted = false;
+              isPrerolling = false;
+              audio.play().catch(handlePlayError);
+            }, AUDIO_PREROLL_MS);
+          })
+          .catch(handlePlayError);
+      } else {
+        isPrerolling = false;
+        audio.play().catch(handlePlayError);
+      }
     } else if (segment.format === 'pcm') {
       // Play PCM using AudioQueue
       if (audioQueueRef.current) {

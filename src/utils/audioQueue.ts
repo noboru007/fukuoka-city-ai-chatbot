@@ -1,6 +1,8 @@
 
 import { decode, decodeAudioData } from './audioHelper';
 
+const AUDIO_PREROLL_SECONDS = 0.5;
+
 export class AudioQueue {
   private audioContext: AudioContext | null = null;
   private queue: string[] = [];
@@ -38,7 +40,21 @@ export class AudioQueue {
     }
 
     this.isPlaying = true;
-    this.nextStartTime = this.audioContext!.currentTime;
+    const context = this.audioContext!;
+
+    // Send a short silent buffer first so mobile/Bluetooth audio devices have
+    // time to wake before the first audible PCM sample is scheduled.
+    const silentBuffer = context.createBuffer(
+      1,
+      Math.ceil(context.sampleRate * AUDIO_PREROLL_SECONDS),
+      context.sampleRate,
+    );
+    const silentSource = context.createBufferSource();
+    silentSource.buffer = silentBuffer;
+    silentSource.connect(context.destination);
+    silentSource.start(context.currentTime);
+
+    this.nextStartTime = context.currentTime + AUDIO_PREROLL_SECONDS;
     await this.scheduleNext();
   }
 
