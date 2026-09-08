@@ -1,4 +1,5 @@
 import express from 'express';
+import { LYRICS_RESPONSE_JSON_SCHEMA, parseLyricsResponse } from '../utils/lyricsStructuredOutput.js';
 
 const router = express.Router();
 
@@ -186,15 +187,18 @@ router.post('/lyrics/generate', async (req, res) => {
         const response = await ai.models.generateContent({
             model: "gemini-3-flash-preview",
             contents: [{ parts: [{ text: prompt }] }],
-            config: { responseMimeType: 'application/json' }
+            config: {
+                responseMimeType: 'application/json',
+                responseJsonSchema: LYRICS_RESPONSE_JSON_SCHEMA,
+            }
         });
 
-        const responseText = response.candidates?.[0]?.content?.parts?.[0]?.text;
+        const responseText = response.text || response.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!responseText) throw new Error("No text generated");
 
-        const data = JSON.parse(responseText);
+        const data = parseLyricsResponse(responseText);
         console.log('[Lyrics] Generated lyrics:', data.title);
-        res.json({ title: data.title || "Untitled", lyrics: data.lyrics || "" });
+        res.json(data);
 
     } catch (error) {
         console.error('[Lyrics] Generation error:', error);
