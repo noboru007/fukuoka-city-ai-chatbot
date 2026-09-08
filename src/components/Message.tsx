@@ -8,6 +8,38 @@ import { translations } from '../utils/translations';
 import { SPEAKER_NAMES } from '../services/geminiService';
 
 const AUDIO_PREROLL_MS = 500;
+const AUDIO_PREROLL_OVERLAP_MS = 150;
+
+const createSilentWavUrl = (durationMs: number): string => {
+  const sampleRate = 8000;
+  const bytesPerSample = 2;
+  const sampleCount = Math.ceil(sampleRate * durationMs / 1000);
+  const dataLength = sampleCount * bytesPerSample;
+  const buffer = new ArrayBuffer(44 + dataLength);
+  const view = new DataView(buffer);
+
+  const writeAscii = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index++) {
+      view.setUint8(offset + index, value.charCodeAt(index));
+    }
+  };
+
+  writeAscii(0, 'RIFF');
+  view.setUint32(4, 36 + dataLength, true);
+  writeAscii(8, 'WAVE');
+  writeAscii(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * bytesPerSample, true);
+  view.setUint16(32, bytesPerSample, true);
+  view.setUint16(34, 16, true);
+  writeAscii(36, 'data');
+  view.setUint32(40, dataLength, true);
+
+  return URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+};
 
 interface MessageProps {
   role: 'user' | 'model';
@@ -27,10 +59,29 @@ const Message: React.FC<MessageProps> = ({ role, content, sources, audioSegments
 
   const audioQueueRef = useRef<AudioQueue | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const warmupAudioRef = useRef<HTMLAudioElement | null>(null);
+  const warmupUrlRef = useRef<string | null>(null);
   const currentSegmentIndexRef = useRef<number>(0);
   const prerollTimeoutRef = useRef<number | null>(null);
 
   const t = translations[language];
+
+  const clearAudioWarmup = () => {
+    if (prerollTimeoutRef.current !== null) {
+      window.clearTimeout(prerollTimeoutRef.current);
+      prerollTimeoutRef.current = null;
+    }
+    if (warmupAudioRef.current) {
+      warmupAudioRef.current.onended = null;
+      warmupAudioRef.current.onerror = null;
+      warmupAudioRef.current.pause();
+      warmupAudioRef.current = null;
+    }
+    if (warmupUrlRef.current) {
+      URL.revokeObjectURL(warmupUrlRef.current);
+      warmupUrlRef.current = null;
+    }
+  };
 
   // Apply items-end/start here to the wrapper to prevent stretching
   const containerClasses = isUser
@@ -49,10 +100,7 @@ const Message: React.FC<MessageProps> = ({ role, content, sources, audioSegments
       });
     }
     return () => {
-      if (prerollTimeoutRef.current !== null) {
-        window.clearTimeout(prerollTimeoutRef.current);
-        prerollTimeoutRef.current = null;
-      }
+      clearAudioWarmup();
       audioQueueRef.current?.stop();
       if (currentAudioRef.current) {
         currentAudioRef.current.pause();
@@ -72,10 +120,7 @@ const Message: React.FC<MessageProps> = ({ role, content, sources, audioSegments
   }, [isGeneratingAudio, audioSegments]);
 
   const stopPlayback = () => {
-    if (prerollTimeoutRef.current !== null) {
-      window.clearTimeout(prerollTimeoutRef.current);
-      prerollTimeoutRef.current = null;
-    }
+    clearAudioWarmup();
     audioQueueRef.current?.stop();
     if (currentAudioRef.current) {
       currentAudioRef.current.pause();
@@ -108,46 +153,60 @@ const Message: React.FC<MessageProps> = ({ role, content, sources, audioSegments
       const audio = new Audio(`data:audio/mp3;base64,${segment.audio}`);
       audio.preload = 'auto';
       currentAudioRef.current = audio;
-      let isPrerolling = segmentIndex === 0;
 
       audio.onended = () => {
-        if (isPrerolling) return;
+        clearAudioWarmup();
         currentAudioRef.current = null;
         playNextSegment(); // Play next segment
       };
 
       audio.onerror = (e) => {
         console.error('MP3 playback error:', e);
+        clearAudioWarmup();
         currentAudioRef.current = null;
         playNextSegment(); // Try next segment
       };
 
       const handlePlayError = (err: unknown) => {
         console.error('Failed to play MP3:', err);
+        clearAudioWarmup();
         currentAudioRef.current = null;
         playNextSegment();
       };
 
-      if (isPrerolling) {
-        // Warm up the browser/device audio path without consuming the beginning
-        // of the speech, then rewind and play it audibly from the first sample.
-        audio.muted = true;
-        audio.play()
+      if (segmentIndex === 0) {
+        // Keep the real speech untouched at its first sample. A separate silent
+        // WAV wakes the browser/device output path and overlaps the real start,
+        // avoiding unreliable MP3 rewinds that can skip the first phoneme.
+        const warmupUrl = createSilentWavUrl(AUDIO_PREROLL_MS + AUDIO_PREROLL_OVERLAP_MS);
+        const warmupAudio = new Audio(warmupUrl);
+        warmupAudio.preload = 'auto';
+        warmupAudioRef.current = warmupAudio;
+        warmupUrlRef.current = warmupUrl;
+
+        warmupAudio.onended = clearAudioWarmup;
+        warmupAudio.onerror = () => {
+          clearAudioWarmup();
+          if (currentAudioRef.current === audio) {
+            audio.play().catch(handlePlayError);
+          }
+        };
+
+        warmupAudio.play()
           .then(() => {
             prerollTimeoutRef.current = window.setTimeout(() => {
               prerollTimeoutRef.current = null;
               if (currentAudioRef.current !== audio) return;
-
-              audio.pause();
-              audio.currentTime = 0;
-              audio.muted = false;
-              isPrerolling = false;
               audio.play().catch(handlePlayError);
             }, AUDIO_PREROLL_MS);
           })
-          .catch(handlePlayError);
+          .catch(() => {
+            clearAudioWarmup();
+            if (currentAudioRef.current === audio) {
+              audio.play().catch(handlePlayError);
+            }
+          });
       } else {
-        isPrerolling = false;
         audio.play().catch(handlePlayError);
       }
     } else if (segment.format === 'pcm') {
